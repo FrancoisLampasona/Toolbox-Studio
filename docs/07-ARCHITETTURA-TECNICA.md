@@ -21,7 +21,9 @@
 - [x] `WordPress Media` e' ora agganciato al registry e al routing come secondo modulo reale della suite.
 - [x] Il backend salva ora anche profili custom WordPress e impostazioni leggere del modulo.
 - [x] `WordPress Media` supporta import/export JSON dei profili tema con collision handling.
-- [x] `Srcset Generator` e `Favicon Generator` sono ora agganciati al registry e al routing come terzo e quarto modulo reale.
+- [x] `Srcset Generator`, `Favicon Generator` e `Social Media Images` sono ora agganciati al registry e al routing come terzo, quarto e quinto modulo reale.
+- [x] `Watch Folder / Automazione` e `Batch Rename` sono ora agganciati al registry e al routing come sesto e settimo modulo reale.
+- [x] Il backend espone ora un watcher filesystem con `notify` e una pipeline rename dedicata con preview/apply.
 - [-] L'architettura a moduli qui descritta e' la direzione target, ma non tutta la suite esiste ancora nel codice.
 - [ ] Home dashboard completa e routing di tutti i moduli futuri sono ancora da costruire.
 - [ ] SQLite, profili condivisi, log attivita' e moduli extra non sono pronti.
@@ -45,13 +47,15 @@
 - [x] Aggiungere un registry moduli reale con piu' di un modulo live.
 - [x] Estendere lo storage leggero ai profili e alle preferenze operative di `WordPress Media`.
 - [x] Estendere routing, storage leggero e shell fino a quattro moduli reali.
+- [x] Estendere routing, storage leggero e shell anche a `Automazione` e `Batch Rename`.
+- [x] Introdurre watcher filesystem live e pipeline rename sicura a due fasi.
 - [ ] Estendere navigazione e shell ai moduli futuri.
 - [ ] Introdurre storage strutturato solo quando serve davvero.
 - [ ] Espandere i moduli uno alla volta senza fingere che siano gia' pronti.
 
 ## Sistema a Moduli
 
-Ogni card della Home corrisponde a un **modulo indipendente**. Architettura pluggabile dove ogni modulo e' un pacchetto autocontenuto. Al momento, nel prodotto reale, la base effettiva e' formata da `optimize` e da un primo `WordPress Media` agganciato alla stessa suite `Toolbox Creative Studio`.
+Ogni card della Home corrisponde a un **modulo indipendente**. Architettura pluggabile dove ogni modulo e' un pacchetto autocontenuto. Nel prodotto reale, la base effettiva e' ormai una piccola suite: `optimize`, `WordPress Media`, `Srcset Generator`, `Favicon Generator`, `Social Media Images`, `Automazione` e `Batch Rename`.
 
 ### Struttura di un Modulo
 
@@ -126,6 +130,7 @@ Navigazione tra Home e moduli tramite React Router.
 /favicon              → Modulo Favicon Generator
 /srcset               → Modulo Srcset Generator
 /social               → Modulo Social Media Images
+/rename               → Modulo Batch Rename
 /editor               → Modulo Editor Foto
 /video                → Modulo Video Tools
 /watermark            → Modulo Watermark Batch
@@ -137,9 +142,9 @@ Navigazione tra Home e moduli tramite React Router.
 
 ### Stato Reale Del Routing
 
-- Oggi esiste un routing reale tra Home, `optimize`, `WordPress Media`, `Srcset Generator` e `Favicon Generator`.
+- Oggi esiste un routing reale tra Home, `optimize`, `WordPress Media`, `Srcset Generator`, `Favicon Generator`, `Social Media Images`, `Automazione`, `Batch Rename`, `Video Tools` e `Team & Brand`.
 - La Home a card centrata e il passaggio fra Home e modulo sono presenti con animazione stagger e gradient accent.
-- L'elenco completo dei moduli sopra resta futuro solo in parte — oggi sono reali `optimize`, `WordPress Media`, `Srcset Generator` e `Favicon Generator`.
+- L'elenco completo dei moduli sopra resta futuro solo in parte — oggi sono reali `optimize`, `WordPress Media`, `Srcset Generator`, `Favicon Generator`, `Social Media Images`, `Automazione`, `Batch Rename`, `Video Tools` e `Team & Brand`.
 
 ### Transizioni
 
@@ -189,6 +194,11 @@ pub fn run() {
 ### Stato Reale Del Backend
 
 - I comandi attuali coprono scan, conversione, output, settings leggeri e import/export JSON dei profili.
+- Il modulo `Social Media Images` riusa il motore di conversione condiviso e lo storage leggero gia' presente nella suite.
+- Il modulo `Automazione` aggiunge un watcher filesystem reale basato su `notify`, con manager condiviso nello stato Tauri.
+- Il modulo `Batch Rename` aggiunge preview backend del naming e apply rename a due fasi per evitare conflitti tra file dello stesso batch.
+- Il modulo `Video Tools` usa FFmpeg di sistema tramite `std::process::Command`, con check stato, compressione batch e frame extraction.
+- Il modulo `Team & Brand` aggiunge storage JSON locale per i brand kit, con CRUD e import/export dedicati.
 - `scan_paths` e' il flusso principale; `scan_images` resta un helper dev.
 - La conversione riceve ora `output_dir` in modo esplicito, quindi non dipende piu' solo da path hardcoded.
 - Il naming output collision-safe nei batch e' risolto in modo deterministico senza cambiare la grafica.
@@ -294,11 +304,11 @@ CREATE TABLE brand_kits (
 
 - Nel prodotto corrente non usiamo ancora SQLite.
 - Le preferenze minime vengono salvate in JSON dentro la app data dir.
-- I profili locali di `optimize`, `WordPress Media` e le preferenze operative di `srcset` / `favicon` vivono nello stesso `settings.json` applicativo.
+- I profili locali di `optimize`, `WordPress Media` e le preferenze operative di `srcset`, `favicon`, `social`, `automation` e `batch rename` vivono nello stesso `settings.json` applicativo.
 - La cache thumbnail vive nella cache dir dell'app.
 - La smoke checklist ufficiale del modulo optimize vive in [08 - QA Optimize](08-QA-OPTIMIZE.md).
 - La Home Dashboard e' stata ridisegnata con layout centrato, card uguali e sezione roadmap muted.
-- Il prossimo modulo reale della suite diventa `Social Media Images`.
+- Il prossimo modulo reale della suite diventa `Team & Brand`.
 
 ### File System
 

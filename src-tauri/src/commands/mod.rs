@@ -1,6 +1,10 @@
+pub mod automation;
+pub mod brand;
 pub mod convert;
 pub mod favicon;
 pub mod filesystem;
 pub mod report;
+pub mod rename;
 pub mod scan;
 pub mod settings;
+pub mod video;

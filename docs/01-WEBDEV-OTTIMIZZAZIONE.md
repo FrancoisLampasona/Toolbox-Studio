@@ -23,6 +23,8 @@
 - [x] Drop dalla Home sulla card del modulo disponibile
 - [x] Collision-safe naming finale chiuso con suffissi deterministici quando serve
 - [x] Import/export JSON dei profili disponibile con collision handling sui nomi importati
+- [x] Qualita' per-file sul preview attivo disponibile senza perdere la qualita' globale
+- [x] Box `Peso finale` disponibile con input/output batch e dettaglio file attivo
 - [x] `Srcset Generator` e' stato promosso a modulo dedicato della suite
 - [ ] Auto-Quality e placeholder non sono ancora implementati
 - [ ] Il modulo resta singolo e non e' ancora spezzato in sotto-moduli interni
@@ -50,6 +52,8 @@
 - Export CSV del batch direttamente dal pannello destro dopo la conversione
 - Profili locali salvabili, applicabili, aggiornabili ed eliminabili dal pannello destro
 - Naming output personalizzabile con token come `{nome}`, `{slug}`, `{preset}`, `{w}`, `{h}`, `{formato}`, `{n}`, `{profilo}`
+- Qualita' globale piu' override per-file sul sorgente attivo direttamente dal pannello destro
+- Box `Peso finale` con input/output batch e dettaglio del file attivo: dati reali dopo la conversione, stima prima della conversione
 - HEIC/HEIF support su macOS (via sips)
 - Input: JPG, PNG, HEIC, HEIF, TIF, TIFF
 
@@ -60,6 +64,8 @@
 - La gestione input/output e' ora usabile anche in sessioni ripetute grazie ai path ricordati e alla visibilita' dei percorsi nel pannello destro.
 - Il modulo ha ora un primo layer di riuso concreto: profili locali che catturano output e impostazioni correnti senza introdurre database.
 - Il naming non e' piu' fisso: il pannello destro permette di definire un pattern, vedere una preview e salvarlo dentro i profili locali.
+- La qualita' non e' piu' solo globale: il file attivo nell'anteprima puo' ricevere un override dedicato, utile quando nello stesso batch vuoi per esempio un 60% e un 80%.
+- Il pannello `Peso finale` da' subito feedback utile: sul batch mostra una stima rapida, sul file attivo usa una stima piu' accurata e poi i dati reali del backend appena il batch e' stato eseguito.
 - Sui batch grandi il modulo ora alleggerisce davvero il rendering della griglia: le card vengono montate a finestra oltre la soglia definita, mantenendo stabile selezione, preview e hydration delle thumbnail.
 - Per i report, oggi il primo step reale e' CSV-first: esportazione disponibile e dati summary piu' coerenti per i multi-preset; il PDF resta dopo.
 - Il prossimo salto di UX piu' utile qui, dopo drag & drop, profili locali, JSON import/export e virtualizzazione, sara' rifinire ulteriormente la fluidita' dei batch grandi e la gestione delle collisioni edge-case senza rompere la semplicita' attuale.

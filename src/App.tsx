@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import AutomationModule from "./modules/automation/AutomationModule";
+import BatchRenameModule from "./modules/batch-rename/BatchRenameModule";
+import BrandModule from "./modules/brand/BrandModule";
 import FaviconModule from "./modules/favicon/FaviconModule";
-import OptimizeModule from "./optimize/OptimizeModule";
+import SocialMediaModule from "./modules/social/SocialMediaModule";
 import SrcsetModule from "./modules/srcset/SrcsetModule";
+import VideoToolsModule from "./modules/video/VideoToolsModule";
 import WordPressModule from "./modules/wordpress/WordPressModule";
+import OptimizeModule from "./optimize/OptimizeModule";
 import {
   HomeDashboard,
+  getEnabledModules,
   getInitialShellRoute,
   getModuleById,
   getModuleByRoute,
   getPreferredModuleRoute,
   normalizeShellRoute,
   shellRoutes,
-  getEnabledModules,
 } from "./shell";
 import type { AppSettings } from "./types";
 
@@ -66,6 +71,47 @@ const DEFAULT_SETTINGS: AppSettings = {
     includeAppleTouch: true,
     includeIco: true,
     includeAndroidIcons: true,
+    includeSafariPinnedTab: true,
+    maskIconColor: "#111827",
+    includeBrowserconfig: true,
+  },
+  lastSocialOptions: {
+    selectedVariantIds: [
+      "instagram-feed-square",
+      "facebook-feed",
+      "linkedin-post",
+      "youtube-thumbnail",
+    ],
+    namingPattern: "{preset}-{slug}-{w}x{h}",
+    assetPath: "/assets/social/",
+    altText: "",
+    format: "webp",
+    quality: 82,
+    resizeMode: "cover",
+    selectedBrandKitId: null,
+  },
+  lastAutomationOptions: {
+    watchPath: null,
+    outputPath: null,
+    selectedProfileId: "__last_optimize__",
+    recursive: true,
+    moveProcessed: false,
+    processedDirName: "Processati",
+  },
+  lastBatchRenameOptions: {
+    namingPattern: "{slug}-{n}",
+    startIndex: 1,
+  },
+  lastVideoOptions: {
+    selectedPresetId: "pct-80",
+    outputPath: null,
+    muteAudio: false,
+    extractFrameAt: 1,
+  },
+  brandKits: [],
+  lastBrandOptions: {
+    selectedBrandKitId: null,
+    lastOutputPath: null,
   },
 };
 
@@ -97,8 +143,34 @@ function mergeSettings(current: AppSettings, partial: Partial<AppSettings>): App
       ...current.lastFaviconOptions,
       ...partial.lastFaviconOptions,
     },
+    lastSocialOptions: {
+      ...current.lastSocialOptions,
+      ...partial.lastSocialOptions,
+      selectedVariantIds:
+        partial.lastSocialOptions?.selectedVariantIds ?? current.lastSocialOptions.selectedVariantIds,
+    },
+    lastAutomationOptions: {
+      ...current.lastAutomationOptions,
+      ...partial.lastAutomationOptions,
+    },
+    lastBatchRenameOptions: {
+      ...current.lastBatchRenameOptions,
+      ...partial.lastBatchRenameOptions,
+    },
+    lastVideoOptions: {
+      ...current.lastVideoOptions,
+      ...partial.lastVideoOptions,
+    },
+    lastBrandOptions: {
+      ...(current.lastBrandOptions ?? {
+        selectedBrandKitId: null,
+        lastOutputPath: null,
+      }),
+      ...(partial.lastBrandOptions ?? {}),
+    },
     optimizeProfiles: partial.optimizeProfiles ?? current.optimizeProfiles,
     wordpressProfiles: partial.wordpressProfiles ?? current.wordpressProfiles,
+    brandKits: partial.brandKits ?? current.brandKits,
   };
 }
 
@@ -215,18 +287,21 @@ function App() {
     setSettings((current) => mergeSettings(current, partial));
   }, []);
 
-  const handleHomeModuleDrop = useCallback((moduleId: string, paths: string[]) => {
-    if (paths.length === 0) {
-      return;
-    }
+  const handleHomeModuleDrop = useCallback(
+    (moduleId: string, paths: string[]) => {
+      if (paths.length === 0) {
+        return;
+      }
 
-    setModuleDropRequest({
-      moduleId,
-      requestId: Date.now(),
-      paths,
-    });
-    openModule(moduleId);
-  }, [openModule]);
+      setModuleDropRequest({
+        moduleId,
+        requestId: Date.now(),
+        paths,
+      });
+      openModule(moduleId);
+    },
+    [openModule]
+  );
 
   const handleDroppedPathsRequestHandled = useCallback((requestId: number) => {
     setModuleDropRequest((current) => {
@@ -290,6 +365,51 @@ function App() {
       {settingsReady ? (
         <FaviconModule
           active={activeRoute === shellRoutes.favicon}
+          initialSettings={settings}
+          onBackHome={openHome}
+          onSettingsChange={handleSettingsChange}
+        />
+      ) : null}
+
+      {settingsReady ? (
+        <SocialMediaModule
+          active={activeRoute === shellRoutes.social}
+          initialSettings={settings}
+          onBackHome={openHome}
+          onSettingsChange={handleSettingsChange}
+        />
+      ) : null}
+
+      {settingsReady ? (
+        <AutomationModule
+          active={activeRoute === shellRoutes.automation}
+          initialSettings={settings}
+          onBackHome={openHome}
+          onSettingsChange={handleSettingsChange}
+        />
+      ) : null}
+
+      {settingsReady ? (
+        <BatchRenameModule
+          active={activeRoute === shellRoutes.batchRename}
+          initialSettings={settings}
+          onBackHome={openHome}
+          onSettingsChange={handleSettingsChange}
+        />
+      ) : null}
+
+      {settingsReady ? (
+        <BrandModule
+          active={activeRoute === shellRoutes.brand}
+          initialSettings={settings}
+          onBackHome={openHome}
+          onSettingsChange={handleSettingsChange}
+        />
+      ) : null}
+
+      {settingsReady ? (
+        <VideoToolsModule
+          active={activeRoute === shellRoutes.video}
           initialSettings={settings}
           onBackHome={openHome}
           onSettingsChange={handleSettingsChange}

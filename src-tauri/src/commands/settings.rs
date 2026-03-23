@@ -201,6 +201,9 @@ pub struct FaviconSettings {
     pub include_apple_touch: bool,
     pub include_ico: bool,
     pub include_android_icons: bool,
+    pub include_safari_pinned_tab: bool,
+    pub mask_icon_color: String,
+    pub include_browserconfig: bool,
 }
 
 impl Default for FaviconSettings {
@@ -217,6 +220,123 @@ impl Default for FaviconSettings {
             include_apple_touch: true,
             include_ico: true,
             include_android_icons: true,
+            include_safari_pinned_tab: true,
+            mask_icon_color: "#111827".to_string(),
+            include_browserconfig: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
+pub struct SocialSettings {
+    pub selected_variant_ids: Vec<String>,
+    pub naming_pattern: String,
+    pub asset_path: String,
+    pub alt_text: String,
+    pub format: String,
+    pub quality: u8,
+    pub resize_mode: String,
+    pub selected_brand_kit_id: Option<String>,
+}
+
+impl Default for SocialSettings {
+    fn default() -> Self {
+        Self {
+            selected_variant_ids: vec![
+                "instagram-feed-square".to_string(),
+                "facebook-feed".to_string(),
+                "linkedin-post".to_string(),
+                "youtube-thumbnail".to_string(),
+            ],
+            naming_pattern: "{preset}-{slug}-{w}x{h}".to_string(),
+            asset_path: "/assets/social/".to_string(),
+            alt_text: String::new(),
+            format: "webp".to_string(),
+            quality: 82,
+            resize_mode: "cover".to_string(),
+            selected_brand_kit_id: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
+pub struct AutomationSettings {
+    pub watch_path: Option<String>,
+    pub output_path: Option<String>,
+    pub selected_profile_id: Option<String>,
+    pub recursive: bool,
+    pub move_processed: bool,
+    pub processed_dir_name: String,
+}
+
+impl Default for AutomationSettings {
+    fn default() -> Self {
+        Self {
+            watch_path: None,
+            output_path: None,
+            selected_profile_id: None,
+            recursive: true,
+            move_processed: false,
+            processed_dir_name: "Processati".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
+pub struct BatchRenameSettings {
+    pub naming_pattern: String,
+    pub start_index: u32,
+}
+
+impl Default for BatchRenameSettings {
+    fn default() -> Self {
+        Self {
+            naming_pattern: "{slug}-{n}".to_string(),
+            start_index: 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
+pub struct VideoSettings {
+    pub selected_preset_id: String,
+    pub output_path: Option<String>,
+    pub mute_audio: bool,
+    pub extract_frame_at: u32,
+}
+
+impl Default for VideoSettings {
+    fn default() -> Self {
+        Self {
+            selected_preset_id: "pct-80".to_string(),
+            output_path: None,
+            mute_audio: false,
+            extract_frame_at: 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
+pub struct BrandSettings {
+    pub selected_brand_kit_id: Option<String>,
+    pub last_output_path: Option<String>,
+}
+
+impl Default for BrandSettings {
+    fn default() -> Self {
+        Self {
+            selected_brand_kit_id: None,
+            last_output_path: None,
         }
     }
 }
@@ -290,6 +410,11 @@ pub struct AppSettings {
     pub wordpress_profiles: Vec<WordPressProfile>,
     pub last_srcset_options: Option<SrcsetSettings>,
     pub last_favicon_options: Option<FaviconSettings>,
+    pub last_social_options: Option<SocialSettings>,
+    pub last_automation_options: Option<AutomationSettings>,
+    pub last_batch_rename_options: Option<BatchRenameSettings>,
+    pub last_video_options: Option<VideoSettings>,
+    pub last_brand_options: Option<BrandSettings>,
 }
 
 impl Default for AppSettings {
@@ -304,6 +429,11 @@ impl Default for AppSettings {
             wordpress_profiles: Vec::new(),
             last_srcset_options: None,
             last_favicon_options: None,
+            last_social_options: None,
+            last_automation_options: None,
+            last_batch_rename_options: None,
+            last_video_options: None,
+            last_brand_options: None,
         }
     }
 }

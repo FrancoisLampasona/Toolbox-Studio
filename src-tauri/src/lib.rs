@@ -6,16 +6,31 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(commands::automation::WatchFolderManager::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
+            commands::automation::get_watch_folder_status,
+            commands::automation::start_watch_folder,
+            commands::automation::stop_watch_folder,
+            commands::brand::get_brand_kits,
+            commands::brand::save_brand_kit,
+            commands::brand::delete_brand_kit,
+            commands::brand::export_brand_kits,
+            commands::brand::import_brand_kits,
             commands::scan::scan_images,
             commands::scan::scan_paths,
             commands::scan::load_thumbnail,
             commands::convert::convert_images,
+            commands::convert::estimate_output_size,
             commands::favicon::generate_favicons,
             commands::report::export_conversion_report,
+            commands::rename::preview_batch_rename,
+            commands::rename::apply_batch_rename,
+            commands::video::get_ffmpeg_status,
+            commands::video::compress_video,
+            commands::video::extract_frame,
             commands::filesystem::open_output_folder,
             commands::filesystem::get_presets,
             commands::filesystem::get_app_output_dir,

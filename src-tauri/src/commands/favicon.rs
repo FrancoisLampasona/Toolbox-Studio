@@ -1,4 +1,5 @@
 use crate::processing::processor;
+use base64::Engine as _;
 use ico::{IconDir, IconDirEntry, IconImage, ResourceType};
 use image::imageops::{self, FilterType};
 use image::{DynamicImage, GenericImageView, ImageFormat, Rgba, RgbaImage};
@@ -6,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs;
 use std::fs::File;
-use std::io::BufWriter;
+use std::io::{BufWriter, Cursor};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -25,6 +26,9 @@ pub struct GenerateFaviconsRequest {
     pub include_apple_touch: bool,
     pub include_ico: bool,
     pub include_android_icons: bool,
+    pub include_safari_pinned_tab: bool,
+    pub mask_icon_color: String,
+    pub include_browserconfig: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -172,6 +176,9 @@ fn build_html_snippet(
     include_ico: bool,
     include_apple_touch: bool,
     include_manifest: bool,
+    include_safari_pinned_tab: bool,
+    mask_icon_color: &str,
+    include_browserconfig: bool,
 ) -> String {
     let mut lines = Vec::new();
 
@@ -205,8 +212,83 @@ fn build_html_snippet(
         ));
     }
 
+    if include_safari_pinned_tab {
+        lines.push(format!(
+            r#"<link rel="mask-icon" href="{}" color="{}">"#,
+            join_asset_path(asset_path, "safari-pinned-tab.svg"),
+            mask_icon_color
+        ));
+    }
+
+    if include_browserconfig {
+        lines.push(format!(
+            r#"<meta name="msapplication-config" content="{}">"#,
+            join_asset_path(asset_path, "browserconfig.xml")
+        ));
+        lines.push(format!(
+            r#"<meta name="msapplication-TileColor" content="{}">"#,
+            theme_color
+        ));
+    }
+
     lines.push(format!(r#"<meta name="theme-color" content="{}">"#, theme_color));
     lines.join("\n")
+}
+
+fn build_mask_image(source: &DynamicImage, size: u32, padding_percent: u8) -> RgbaImage {
+    let fitted = build_square_image(source, size, padding_percent, Rgba([0, 0, 0, 0]), true);
+    let mut mask = RgbaImage::from_pixel(size, size, Rgba([0, 0, 0, 0]));
+
+    for (x, y, pixel) in fitted.enumerate_pixels() {
+        let [r, g, b, a] = pixel.0;
+        let luminance = (0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32).round() as u8;
+        let alpha = ((luminance as u16 * a as u16) / 255) as u8;
+        mask.put_pixel(x, y, Rgba([255, 255, 255, alpha]));
+    }
+
+    mask
+}
+
+fn encode_png_data_uri(image: &RgbaImage) -> Result<String, String> {
+    let mut cursor = Cursor::new(Vec::new());
+    DynamicImage::ImageRgba8(image.clone())
+        .write_to(&mut cursor, ImageFormat::Png)
+        .map_err(|e| format!("Errore encoding PNG in memoria: {}", e))?;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(cursor.into_inner());
+    Ok(format!("data:image/png;base64,{}", encoded))
+}
+
+fn build_safari_pinned_tab_svg(
+    source: &DynamicImage,
+    padding_percent: u8,
+    mask_icon_color: &str,
+) -> Result<String, String> {
+    let mask_image = build_mask_image(source, 256, padding_percent);
+    let data_uri = encode_png_data_uri(&mask_image)?;
+    Ok(format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="{color}"><defs><mask id="favicon-mask"><rect width="256" height="256" fill="black"/><image href="{data_uri}" x="0" y="0" width="256" height="256" preserveAspectRatio="xMidYMid meet"/></mask></defs><rect width="256" height="256" fill="{color}" mask="url(#favicon-mask)"/></svg>"#,
+        color = mask_icon_color.trim(),
+        data_uri = data_uri
+    ))
+}
+
+fn build_browserconfig_xml(asset_path: &str, tile_color: &str) -> String {
+    format!(
+        r#"<?xml version="1.0" encoding="utf-8"?>
+<browserconfig>
+  <msapplication>
+    <tile>
+      <square70x70logo src="{square70}"/>
+      <square150x150logo src="{square150}"/>
+      <TileColor>{tile_color}</TileColor>
+    </tile>
+  </msapplication>
+</browserconfig>
+"#,
+        square70 = join_asset_path(asset_path, "mstile-70x70.png"),
+        square150 = join_asset_path(asset_path, "mstile-150x150.png"),
+        tile_color = tile_color.trim()
+    )
 }
 
 #[tauri::command]
@@ -239,6 +321,8 @@ pub async fn generate_favicons(
 
     let include_android_icons = request.include_android_icons || request.include_manifest;
     let include_manifest = request.include_manifest;
+    let include_browserconfig = request.include_browserconfig;
+    let include_safari_pinned_tab = request.include_safari_pinned_tab;
     let asset_path = normalize_asset_path(&request.asset_path);
     let mut generated_files = Vec::new();
 
@@ -310,6 +394,30 @@ pub async fn generate_favicons(
         }
     }
 
+    if include_browserconfig {
+        for (filename, label, size) in [
+            ("mstile-70x70.png", "Windows Tile 70", 70u32),
+            ("mstile-150x150.png", "Windows Tile 150", 150u32),
+        ] {
+            let path = output_dir.join(filename);
+            let image = build_square_image(
+                &source,
+                size,
+                request.padding_percent,
+                background,
+                false,
+            );
+            let bytes = save_png(&path, &image)?;
+            generated_files.push(GeneratedFaviconFile {
+                label: label.to_string(),
+                filename: filename.to_string(),
+                path: path.to_string_lossy().to_string(),
+                bytes,
+                size,
+            });
+        }
+    }
+
     if request.include_ico {
         let filename = "favicon.ico";
         let path = output_dir.join(filename);
@@ -320,6 +428,56 @@ pub async fn generate_favicons(
             path: path.to_string_lossy().to_string(),
             bytes,
             size: 48,
+        });
+    }
+
+    if include_safari_pinned_tab {
+        let filename = "safari-pinned-tab.svg";
+        let path = output_dir.join(filename);
+        let svg = build_safari_pinned_tab_svg(
+            &source,
+            request.padding_percent,
+            &request.mask_icon_color,
+        )?;
+        fs::write(&path, svg).map_err(|e| {
+            format!(
+                "Errore scrittura safari pinned tab {}: {}",
+                path.display(),
+                e
+            )
+        })?;
+        let bytes = fs::metadata(&path)
+            .map_err(|e| format!("Errore metadati safari pinned tab {}: {}", path.display(), e))?
+            .len();
+        generated_files.push(GeneratedFaviconFile {
+            label: "Safari Pinned Tab".to_string(),
+            filename: filename.to_string(),
+            path: path.to_string_lossy().to_string(),
+            bytes,
+            size: 0,
+        });
+    }
+
+    if include_browserconfig {
+        let filename = "browserconfig.xml";
+        let path = output_dir.join(filename);
+        let xml = build_browserconfig_xml(&asset_path, &request.background_color);
+        fs::write(&path, xml).map_err(|e| {
+            format!(
+                "Errore scrittura browserconfig {}: {}",
+                path.display(),
+                e
+            )
+        })?;
+        let bytes = fs::metadata(&path)
+            .map_err(|e| format!("Errore metadati browserconfig {}: {}", path.display(), e))?
+            .len();
+        generated_files.push(GeneratedFaviconFile {
+            label: "BrowserConfig".to_string(),
+            filename: filename.to_string(),
+            path: path.to_string_lossy().to_string(),
+            bytes,
+            size: 0,
         });
     }
 
@@ -372,6 +530,9 @@ pub async fn generate_favicons(
             request.include_ico,
             request.include_apple_touch,
             include_manifest,
+            include_safari_pinned_tab,
+            &request.mask_icon_color,
+            include_browserconfig,
         ),
         manifest_path,
     })
@@ -379,7 +540,13 @@ pub async fn generate_favicons(
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_asset_path, parse_hex_color};
+    use super::{
+        build_browserconfig_xml,
+        build_safari_pinned_tab_svg,
+        normalize_asset_path,
+        parse_hex_color,
+    };
+    use image::{DynamicImage, Rgba, RgbaImage};
 
     #[test]
     fn normalize_asset_path_adds_leading_and_trailing_slash() {
@@ -393,5 +560,22 @@ mod tests {
         assert_eq!(parse_hex_color("#fff").unwrap().0, [255, 255, 255, 255]);
         assert_eq!(parse_hex_color("#111827").unwrap().0, [17, 24, 39, 255]);
         assert!(parse_hex_color("not-a-color").is_err());
+    }
+
+    #[test]
+    fn browserconfig_xml_includes_windows_tile_assets() {
+        let xml = build_browserconfig_xml("/assets/", "#ffffff");
+        assert!(xml.contains("mstile-70x70.png"));
+        assert!(xml.contains("mstile-150x150.png"));
+        assert!(xml.contains("#ffffff"));
+    }
+
+    #[test]
+    fn safari_pinned_tab_svg_is_generated() {
+        let image = DynamicImage::ImageRgba8(RgbaImage::from_pixel(16, 16, Rgba([255, 0, 0, 255])));
+        let svg = build_safari_pinned_tab_svg(&image, 10, "#111111").unwrap();
+        assert!(svg.contains("data:image/png;base64,"));
+        assert!(svg.contains("#111111"));
+        assert!(svg.contains("mask"));
     }
 }

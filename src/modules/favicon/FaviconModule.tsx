@@ -29,7 +29,13 @@ interface PlannedOutputItem {
   size: string;
 }
 
-const DEFAULT_FAVICON_SETTINGS: FaviconModuleSettings = {
+type FaviconModuleRuntimeSettings = FaviconModuleSettings & {
+  includeSafariPinnedTab: boolean;
+  maskIconColor: string;
+  includeBrowserconfig: boolean;
+};
+
+const DEFAULT_FAVICON_SETTINGS: FaviconModuleRuntimeSettings = {
   appName: "Toolbox Creative Studio",
   shortName: "Toolbox",
   assetPath: "/",
@@ -41,6 +47,9 @@ const DEFAULT_FAVICON_SETTINGS: FaviconModuleSettings = {
   includeAppleTouch: true,
   includeIco: true,
   includeAndroidIcons: true,
+  includeSafariPinnedTab: true,
+  maskIconColor: "#111827",
+  includeBrowserconfig: true,
 };
 
 function dedupePaths(paths: string[]): string[] {
@@ -106,7 +115,7 @@ function joinAssetPath(base: string, filename: string): string {
   return base === "/" ? `/${filename}` : `${base}${filename}`;
 }
 
-function buildSnippetPreview(settings: FaviconModuleSettings): string {
+function buildSnippetPreview(settings: FaviconModuleRuntimeSettings): string {
   const assetPath = normalizeAssetPath(settings.assetPath);
   const lines: string[] = [];
 
@@ -135,11 +144,26 @@ function buildSnippetPreview(settings: FaviconModuleSettings): string {
     );
   }
 
+  if (settings.includeSafariPinnedTab) {
+    lines.push(
+      `<link rel="mask-icon" href="${joinAssetPath(assetPath, "safari-pinned-tab.svg")}" color="${settings.maskIconColor}">`
+    );
+  }
+
+  if (settings.includeBrowserconfig) {
+    lines.push(
+      `<meta name="msapplication-config" content="${joinAssetPath(assetPath, "browserconfig.xml")}">`
+    );
+    lines.push(
+      `<meta name="msapplication-TileColor" content="${settings.backgroundColor}">`
+    );
+  }
+
   lines.push(`<meta name="theme-color" content="${settings.themeColor}">`);
   return lines.join("\n");
 }
 
-function buildPlannedOutputs(settings: FaviconModuleSettings): PlannedOutputItem[] {
+function buildPlannedOutputs(settings: FaviconModuleRuntimeSettings): PlannedOutputItem[] {
   const items: PlannedOutputItem[] = [
     { label: "PNG 16", filename: "favicon-16x16.png", size: "16x16" },
     { label: "PNG 32", filename: "favicon-32x32.png", size: "32x32" },
@@ -174,6 +198,18 @@ function buildPlannedOutputs(settings: FaviconModuleSettings): PlannedOutputItem
 
   if (settings.includeManifest) {
     items.push({ label: "Manifest", filename: "site.webmanifest", size: "JSON" });
+  }
+
+  if (settings.includeSafariPinnedTab) {
+    items.push({ label: "Safari Mask", filename: "safari-pinned-tab.svg", size: "SVG" });
+  }
+
+  if (settings.includeBrowserconfig) {
+    items.push(
+      { label: "Windows Tile 70", filename: "mstile-70x70.png", size: "70x70" },
+      { label: "Windows Tile 150", filename: "mstile-150x150.png", size: "150x150" },
+      { label: "BrowserConfig", filename: "browserconfig.xml", size: "XML" }
+    );
   }
 
   return items;
@@ -252,6 +288,13 @@ export default function FaviconModule({
   const [includeAppleTouch, setIncludeAppleTouch] = useState(DEFAULT_FAVICON_SETTINGS.includeAppleTouch);
   const [includeIco, setIncludeIco] = useState(DEFAULT_FAVICON_SETTINGS.includeIco);
   const [includeAndroidIcons, setIncludeAndroidIcons] = useState(DEFAULT_FAVICON_SETTINGS.includeAndroidIcons);
+  const [includeSafariPinnedTab, setIncludeSafariPinnedTab] = useState(
+    DEFAULT_FAVICON_SETTINGS.includeSafariPinnedTab
+  );
+  const [maskIconColor, setMaskIconColor] = useState(DEFAULT_FAVICON_SETTINGS.maskIconColor);
+  const [includeBrowserconfig, setIncludeBrowserconfig] = useState(
+    DEFAULT_FAVICON_SETTINGS.includeBrowserconfig
+  );
   const [images, setImages] = useState<ImageInfo[]>([]);
   const [selectedSourcePath, setSelectedSourcePath] = useState<string | null>(null);
   const [inputPaths, setInputPaths] = useState<string[]>([]);
@@ -277,7 +320,7 @@ export default function FaviconModule({
   const thumbTimerRef = useRef<number | null>(null);
   const saveTimerRef = useRef<number | null>(null);
 
-  const settingsSnapshot = useMemo<FaviconModuleSettings>(
+  const settingsSnapshot = useMemo<FaviconModuleRuntimeSettings>(
     () => ({
       appName,
       shortName,
@@ -290,6 +333,9 @@ export default function FaviconModule({
       includeAppleTouch,
       includeIco,
       includeAndroidIcons,
+      includeSafariPinnedTab,
+      maskIconColor,
+      includeBrowserconfig,
     }),
     [
       appName,
@@ -299,6 +345,9 @@ export default function FaviconModule({
       includeAppleTouch,
       includeIco,
       includeManifest,
+      includeSafariPinnedTab,
+      maskIconColor,
+      includeBrowserconfig,
       paddingPercent,
       shortName,
       themeColor,
@@ -350,7 +399,7 @@ export default function FaviconModule({
       setInputPaths(initialSettings.lastInputPaths);
     }
 
-    const faviconSettings = initialSettings.lastFaviconOptions;
+    const faviconSettings = initialSettings.lastFaviconOptions as Partial<FaviconModuleRuntimeSettings> | undefined;
     if (faviconSettings) {
       setAppName(faviconSettings.appName || DEFAULT_FAVICON_SETTINGS.appName);
       setShortName(faviconSettings.shortName || DEFAULT_FAVICON_SETTINGS.shortName);
@@ -367,6 +416,13 @@ export default function FaviconModule({
       setIncludeAppleTouch(faviconSettings.includeAppleTouch ?? DEFAULT_FAVICON_SETTINGS.includeAppleTouch);
       setIncludeIco(faviconSettings.includeIco ?? DEFAULT_FAVICON_SETTINGS.includeIco);
       setIncludeAndroidIcons(faviconSettings.includeAndroidIcons ?? DEFAULT_FAVICON_SETTINGS.includeAndroidIcons);
+      setIncludeSafariPinnedTab(
+        faviconSettings.includeSafariPinnedTab ?? DEFAULT_FAVICON_SETTINGS.includeSafariPinnedTab
+      );
+      setMaskIconColor(faviconSettings.maskIconColor || DEFAULT_FAVICON_SETTINGS.maskIconColor);
+      setIncludeBrowserconfig(
+        faviconSettings.includeBrowserconfig ?? DEFAULT_FAVICON_SETTINGS.includeBrowserconfig
+      );
     }
   }, [initialSettings]);
 
@@ -391,7 +447,7 @@ export default function FaviconModule({
       onSettingsChange({
         lastInputPaths: inputPaths,
         lastOutputPath: outputPath,
-        lastFaviconOptions: settingsSnapshot,
+        lastFaviconOptions: settingsSnapshot as unknown as FaviconModuleSettings,
       });
     }, 250);
 
@@ -681,6 +737,9 @@ export default function FaviconModule({
           includeAppleTouch,
           includeIco,
           includeAndroidIcons,
+          includeSafariPinnedTab,
+          maskIconColor,
+          includeBrowserconfig,
         },
       });
 
@@ -889,6 +948,40 @@ export default function FaviconModule({
                   />
                   <span>Genera `site.webmanifest`</span>
                 </label>
+                <label className="favicon-toggle">
+                  <input
+                    type="checkbox"
+                    checked={includeSafariPinnedTab}
+                    onChange={(event) => setIncludeSafariPinnedTab(event.target.checked)}
+                  />
+                  <span>Genera `safari-pinned-tab.svg`</span>
+                </label>
+                <label className="favicon-toggle">
+                  <input
+                    type="checkbox"
+                    checked={includeBrowserconfig}
+                    onChange={(event) => setIncludeBrowserconfig(event.target.checked)}
+                  />
+                  <span>Genera `browserconfig.xml` e tile Windows</span>
+                </label>
+              </div>
+
+              <div className="favicon-section">
+                <div className="favicon-color-grid">
+                  <label className="favicon-color-field">
+                    <span>Mask icon color</span>
+                    <div className="favicon-color-input">
+                      <input type="color" value={maskIconColor} onChange={(event) => setMaskIconColor(event.target.value)} />
+                      <input
+                        className="profile-name-input"
+                        type="text"
+                        value={maskIconColor}
+                        onChange={(event) => setMaskIconColor(event.target.value)}
+                        spellCheck={false}
+                      />
+                    </div>
+                  </label>
+                </div>
               </div>
 
               <div className="favicon-section">

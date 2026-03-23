@@ -25,7 +25,14 @@
 - [x] `WordPress Media` supporta ora profili custom locali, import/export JSON e persistenza leggera delle impostazioni
 - [x] `Srcset Generator` esiste ora come terzo modulo reale della suite con snippet HTML, preset responsive e conversione batch
 - [x] `Favicon Generator` esiste ora come quarto modulo reale della suite con PNG, ICO, manifest e snippet head
-- [ ] I moduli social, video e automazioni non sono ancora implementati
+- [x] `Social Media Images` esiste ora come quinto modulo reale della suite per template social e batch multi-piattaforma
+- [x] `Watch Folder / Automazione` esiste ora come sesto modulo reale con cartella sorvegliata, riuso profili optimize e stato live
+- [x] `Batch Rename` esiste ora come settimo modulo reale con preview naming, collision handling e rinomina in-place
+- [x] `Video Tools` esiste ora come ottavo modulo reale con stato FFmpeg, compressione batch e poster frame
+- [x] `Team & Brand` esiste ora come nono modulo reale con brand kit locali e persistenza minima
+- [x] `Optimize` mostra ora il peso finale stimato/reale e supporta qualita' diverse per file selezionato
+- [x] `Social Media Images` puo' ora consumare un Brand Kit locale come sorgente automatica di base
+- [x] `Favicon Generator` copre ora anche Safari pinned tab e browserconfig Windows
 - [ ] SQLite, profili condivisi e log attivita' restano roadmap
 
 Toolbox Creative Studio nasce come tool verticale per ottimizzare immagini per siti WordPress. La vision e' trasformarlo in una **suite modulare** per creativi digitali e web developer: un coltellino svizzero aziendale dove ogni funzionalita' e' un modulo accessibile dalla Home.
@@ -46,7 +53,15 @@ Toolbox Creative Studio nasce come tool verticale per ottimizzare immagini per s
 - `WordPress Media` e' ora il secondo modulo reale della suite: profili built-in e custom, selezione componenti, naming WordPress, fallback multi-formato base e conversione batch.
 - `Srcset Generator` e' ora il terzo modulo reale: preset responsive, larghezze custom, snippet `img/srcset` o `picture`, copy snippet ed export CSV del batch.
 - `Favicon Generator` e' ora il quarto modulo reale: genera `favicon.ico`, PNG 16/32, apple-touch, Android icons, `site.webmanifest` e snippet head.
-- Il prossimo modulo reale dopo questo step diventa `Social Media Images`.
+- `Social Media Images` e' ora il quinto modulo reale: template social per piattaforma, varianti batch e preset multi-canale.
+- `Watch Folder / Automazione` e' ora il sesto modulo reale: osserva una cartella locale, riusa i job di optimize, tiene una coda operativa e puo' spostare gli originali in `Processati`.
+- `Batch Rename` e' ora il settimo modulo reale: anteprima naming, collision-safe suffix, rinomina in-place e stato batch direttamente nella suite.
+- `Video Tools` e' ora l'ottavo modulo reale: FFmpeg di sistema, target 60/70/80/90 per file, peso finale stimato/reale ed estrazione poster frame.
+- `Team & Brand` e' ora il nono modulo reale: CRUD di brand kit locali, preview palette/font/logo e base condivisibile via JSON.
+- In `Optimize`, il pannello destro mostra ora il peso finale batch/file e la qualita' puo' essere personalizzata per il file attivo senza toccare quella globale.
+- `Social Media Images` puo' ora leggere i brand kit locali e applicarli al modulo per precompilare asset path, alt text e contesto visuale.
+- `Favicon Generator` genera anche `safari-pinned-tab.svg`, `browserconfig.xml` e tile Windows insieme allo snippet head aggiornato.
+- L'espansione dei moduli si ferma qui per questo round: il focus torna su stabilita', polish e chiusura dei flussi gia' presenti.
 
 ---
 
@@ -134,17 +149,18 @@ Ogni card ha:
 | **P0** | Shell minima Toolbox Creative Studio | Parziale |
 | **P1** | Favicon Generator | Implementato |
 | **P1** | Responsive Srcset Generator | Implementato |
-| **P1** | Social Media Image Generator | Roadmap |
-| **P2** | Watch Folder / Automazione | Roadmap |
+| **P1** | Social Media Images | Implementato |
+| **P2** | Watch Folder / Automazione | Implementato |
+| **P2** | Batch Rename | Implementato |
+| **P2** | Team & Brand (brand kit locali) | Implementato |
 | **P2** | Profili Cliente/Progetto | Parziale (locali in optimize) |
 | **P2** | Watermark Batch | Roadmap |
 | **P2** | EXIF Manager | Roadmap |
 | **P2** | WordPress Media (profili tema) | Parziale |
 | **P3** | Editor Foto (crop, filtri, correzioni) | Roadmap |
-| **P3** | Video Tools (compressione, frame extraction) | Roadmap |
+| **P2** | Video Tools (compressione, frame extraction) | Implementato |
 | **P3** | Background Remover (AI) | Roadmap |
-| **P3** | Brand Kit / Team | Roadmap |
-| **P3** | Batch Rename | Parziale (naming pattern in optimize) |
+| **P3** | Brand Kit / Team condiviso, log e sync multiutente | Roadmap |
 
 ---
 
@@ -172,6 +188,8 @@ Ogni card ha:
 - [03 - Workflow & Automazione](03-WEBDEV-WORKFLOW.md)
 - [09 - Srcset Generator](09-WEBDEV-SRCSET.md)
 - [10 - Favicon Generator](10-WEBDEV-FAVICON.md)
+- [11 - Social Media Images](11-WEBDEV-SOCIAL.md)
+- [12 - Batch Rename](12-WEBDEV-BATCH-RENAME.md)
 - [04 - Editing Foto](04-EDITING-FOTO.md)
 - [05 - Editing Video](05-EDITING-VIDEO.md)
 - [06 - Collaborazione & Brand](06-COLLABORAZIONE.md)

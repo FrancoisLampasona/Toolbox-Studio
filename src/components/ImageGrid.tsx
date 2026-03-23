@@ -4,6 +4,13 @@ import { Grid, type CellComponentProps } from "react-window";
 import type { ImageInfo } from "../types";
 import ImageCard from "./ImageCard";
 
+interface FileEstimate {
+  outputName: string;
+  estimatedOutputSize: number;
+  jobCount: number;
+  qualityOverride: number | null;
+}
+
 interface Props {
   images: ImageInfo[];
   selectedFiles: Set<string>;
@@ -12,12 +19,13 @@ interface Props {
   onDeselectAll: () => void;
   onClearAll: () => void;
   scanning: boolean;
+  fileEstimates?: Map<string, FileEstimate>;
 }
 
 const LARGE_BATCH_THRESHOLD = 72;
 const GRID_GAP = 12;
 const GRID_MIN_CARD_WIDTH = 150;
-const GRID_CARD_EXTRA_HEIGHT = 42;
+const GRID_CARD_EXTRA_HEIGHT = 72; // increased for estimates row
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -33,6 +41,7 @@ type GridCellData = {
   onToggleSelect: (path: string) => void;
   formatBytes: (bytes: number) => string;
   columnCount: number;
+  fileEstimates?: Map<string, FileEstimate>;
 };
 
 function GridCell({
@@ -44,6 +53,7 @@ function GridCell({
   onToggleSelect,
   formatBytes,
   columnCount,
+  fileEstimates,
 }: CellComponentProps<GridCellData>) {
   const index = rowIndex * columnCount + columnIndex;
   const image = images[index];
@@ -52,6 +62,8 @@ function GridCell({
     return null;
   }
 
+  const estimate = fileEstimates?.get(image.path);
+
   return (
     <div style={{ ...style, boxSizing: "border-box", padding: GRID_GAP / 2 }}>
       <ImageCard
@@ -59,6 +71,10 @@ function GridCell({
         selected={selectedFiles.has(image.path)}
         onToggle={onToggleSelect}
         formatBytes={formatBytes}
+        outputName={estimate?.outputName}
+        estimatedOutputSize={estimate?.estimatedOutputSize}
+        jobCount={estimate?.jobCount}
+        qualityOverride={estimate?.qualityOverride}
       />
     </div>
   );
@@ -84,18 +100,26 @@ function NormalGrid({
   images,
   selectedFiles,
   onToggleSelect,
-}: Pick<Props, "images" | "selectedFiles" | "onToggleSelect">) {
+  fileEstimates,
+}: Pick<Props, "images" | "selectedFiles" | "onToggleSelect" | "fileEstimates">) {
   return (
     <div className="image-grid">
-      {images.map((img) => (
-        <ImageCard
-          key={img.path}
-          image={img}
-          selected={selectedFiles.has(img.path)}
-          onToggle={onToggleSelect}
-          formatBytes={formatBytes}
-        />
-      ))}
+      {images.map((img) => {
+        const estimate = fileEstimates?.get(img.path);
+        return (
+          <ImageCard
+            key={img.path}
+            image={img}
+            selected={selectedFiles.has(img.path)}
+            onToggle={onToggleSelect}
+            formatBytes={formatBytes}
+            outputName={estimate?.outputName}
+            estimatedOutputSize={estimate?.estimatedOutputSize}
+            jobCount={estimate?.jobCount}
+            qualityOverride={estimate?.qualityOverride}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -104,7 +128,8 @@ function VirtualizedGrid({
   images,
   selectedFiles,
   onToggleSelect,
-}: Pick<Props, "images" | "selectedFiles" | "onToggleSelect">) {
+  fileEstimates,
+}: Pick<Props, "images" | "selectedFiles" | "onToggleSelect" | "fileEstimates">) {
   return (
     <div className="image-grid virtualized-grid large-grid">
       <AutoSizer
@@ -124,6 +149,7 @@ function VirtualizedGrid({
             onToggleSelect,
             formatBytes,
             columnCount,
+            fileEstimates,
           };
 
           return (
@@ -156,6 +182,7 @@ export default function ImageGrid({
   onDeselectAll,
   onClearAll,
   scanning,
+  fileEstimates,
 }: Props) {
   const isLargeBatch = images.length > LARGE_BATCH_THRESHOLD;
 
@@ -209,12 +236,14 @@ export default function ImageGrid({
           images={images}
           selectedFiles={selectedFiles}
           onToggleSelect={onToggleSelect}
+          fileEstimates={fileEstimates}
         />
       ) : (
         <NormalGrid
           images={images}
           selectedFiles={selectedFiles}
           onToggleSelect={onToggleSelect}
+          fileEstimates={fileEstimates}
         />
       )}
     </div>

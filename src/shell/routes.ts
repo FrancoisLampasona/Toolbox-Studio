@@ -6,6 +6,11 @@ export const shellRoutes = {
   wordpress: "/wordpress",
   srcset: "/srcset",
   favicon: "/favicon",
+  social: "/social",
+  brand: "/brand",
+  automation: "/automation",
+  batchRename: "/rename",
+  video: "/video",
 } as const;
 
 export type ShellRoute = (typeof shellRoutes)[keyof typeof shellRoutes];
@@ -41,6 +46,26 @@ export function normalizeShellRoute(pathname: string): ShellRoute {
     return shellRoutes.favicon;
   }
 
+  if (normalizedPath === shellRoutes.social) {
+    return shellRoutes.social;
+  }
+
+  if (normalizedPath === shellRoutes.brand) {
+    return shellRoutes.brand;
+  }
+
+  if (normalizedPath === shellRoutes.automation) {
+    return shellRoutes.automation;
+  }
+
+  if (normalizedPath === shellRoutes.batchRename) {
+    return shellRoutes.batchRename;
+  }
+
+  if (normalizedPath === shellRoutes.video) {
+    return shellRoutes.video;
+  }
+
   return shellRoutes.home;
 }
 
@@ -58,7 +83,12 @@ export function getBackRoute(currentRoute: ShellRoute): ShellRoute {
   return currentRoute === shellRoutes.optimize ||
     currentRoute === shellRoutes.wordpress ||
     currentRoute === shellRoutes.srcset ||
-    currentRoute === shellRoutes.favicon
+    currentRoute === shellRoutes.favicon ||
+    currentRoute === shellRoutes.social ||
+    currentRoute === shellRoutes.brand ||
+    currentRoute === shellRoutes.automation ||
+    currentRoute === shellRoutes.batchRename ||
+    currentRoute === shellRoutes.video
     ? shellRoutes.home
     : shellRoutes.home;
 }

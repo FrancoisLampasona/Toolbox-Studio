@@ -14,8 +14,8 @@
 - [x] Genera `site.webmanifest`
 - [x] Mostra e copia uno snippet `<head>` coerente con gli asset attivi
 - [x] Ricorda localmente nome app, short name, colori, path asset e toggle principali
-- [ ] SVG mask icon e varianti Safari pinned tab non sono ancora presenti
-- [ ] Browserconfig / tile Windows avanzato non e' ancora presente
+- [x] Genera `safari-pinned-tab.svg` e aggiorna lo snippet Safari
+- [x] Genera `browserconfig.xml` e tile Windows base
 
 ## Stato Reale Oggi
 
@@ -33,6 +33,8 @@
 - `android-chrome-192x192.png`
 - `android-chrome-512x512.png`
 - `site.webmanifest`
+- `safari-pinned-tab.svg`
+- `browserconfig.xml`
 
 ## Snippet Generato
 
@@ -42,12 +44,14 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#111827">
+<meta name="msapplication-config" content="/browserconfig.xml">
+<meta name="msapplication-TileColor" content="#111827">
 <meta name="theme-color" content="#111827">
 ```
 
 ## Roadmap Da Qui
 
-- SVG e mask icon per Safari pinned tab
 - Varianti brand kit condivise
 - Export preset per progetto/cliente
 - Integrazione futura con `Brand Kit / Collaborazione`

@@ -1,6 +1,11 @@
+import { automationModule } from "./automation/config";
+import { batchRenameModule } from "./batch-rename/config";
+import { brandModule } from "./brand/config";
 import { faviconModule } from "./favicon/config";
 import { optimizeModule, type ModuleConfig } from "./optimize/config";
+import { socialModule } from "./social/config";
 import { srcsetModule } from "./srcset/config";
+import { videoModule } from "./video/config";
 import { wordpressModule } from "./wordpress/config";
 
 export const moduleRegistry: ModuleConfig[] = [
@@ -8,6 +13,11 @@ export const moduleRegistry: ModuleConfig[] = [
   wordpressModule,
   srcsetModule,
   faviconModule,
+  socialModule,
+  videoModule,
+  brandModule,
+  automationModule,
+  batchRenameModule,
 ];
 
 export function getEnabledModules(): ModuleConfig[] {

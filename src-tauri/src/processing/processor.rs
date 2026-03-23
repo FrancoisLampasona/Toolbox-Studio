@@ -42,7 +42,7 @@ pub struct ConvertResult {
     pub output_size: u64,
 }
 
-const DEFAULT_NAMING_PATTERN: &str = "{nome}{suffix}_{w}x{h}";
+pub const DEFAULT_NAMING_PATTERN: &str = "{nome}{suffix}_{w}x{h}";
 
 pub fn is_supported_extension(ext: &str) -> bool {
     matches!(ext, "jpg" | "jpeg" | "png" | "heic" | "heif" | "tif" | "tiff")
@@ -157,8 +157,7 @@ pub fn convert_loaded_image(
     output_path: &Path,
     options: &ConvertOptions,
 ) -> Result<ConvertResult, String> {
-    let resized = resize_image(img, options);
-    save_image(&resized, output_path, options)?;
+    save_image(img, output_path, options)?;
 
     let output_size = fs::metadata(output_path)
         .map_err(|e| format!("Errore metadati output: {}", e))?
@@ -169,6 +168,15 @@ pub fn convert_loaded_image(
         input_size,
         output_size,
     })
+}
+
+pub fn estimate_output_size(path: &Path, options: &ConvertOptions) -> Result<(u64, u64), String> {
+    let input_size = fs::metadata(path)
+        .map_err(|e| format!("Errore metadati input {}: {}", path.display(), e))?
+        .len();
+    let img = load_image(path)?;
+    let encoded = encode_image_bytes(&img, options)?;
+    Ok((input_size, encoded.len() as u64))
 }
 
 pub fn add_collision_suffix(path: &Path, collision_index: usize) -> PathBuf {
@@ -192,34 +200,31 @@ pub fn add_collision_suffix(path: &Path, collision_index: usize) -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(filename))
 }
 
-pub fn build_output_path(
-    input_path: &Path,
-    output_dir: &Path,
-    options: &ConvertOptions,
+pub fn build_named_stem(
+    original_stem: &str,
+    width: u32,
+    height: u32,
+    format_label: &str,
+    suffix: &str,
     naming_pattern: Option<&str>,
     profile_name: Option<&str>,
     sequence_number: usize,
-) -> PathBuf {
-    let original_stem = input_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("image");
+) -> String {
     let pattern = naming_pattern
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .unwrap_or(DEFAULT_NAMING_PATTERN);
-    let format_label = output_extension(options);
-    let preset_label = preset_label_from_suffix(&options.suffix);
+    let preset_label = preset_label_from_suffix(suffix);
     let sequence_label = format!("{:03}", sequence_number.max(1));
     let profile_slug = slugify_component(profile_name.unwrap_or(""));
     let replacements = [
         ("{nome}", sanitize_filename_component(original_stem)),
         ("{slug}", slugify_component(original_stem)),
-        ("{suffix}", sanitize_suffix_token(&options.suffix)),
+        ("{suffix}", sanitize_suffix_token(suffix)),
         ("{preset}", preset_label.clone()),
         ("{componente}", preset_label),
-        ("{w}", options.width.to_string()),
-        ("{h}", options.height.to_string()),
+        ("{w}", width.to_string()),
+        ("{h}", height.to_string()),
         ("{formato}", format_label.to_string()),
         ("{n}", sequence_label),
         (
@@ -242,13 +247,43 @@ pub fn build_output_path(
         if sanitized.is_empty() {
             sanitize_filename_component(&format!(
                 "{}{}_{}x{}",
-                original_stem, options.suffix, options.width, options.height
+                original_stem, suffix, width, height
             ))
         } else {
             sanitized
         }
     };
 
+    if output_stem.is_empty() {
+        "image".to_string()
+    } else {
+        output_stem
+    }
+}
+
+pub fn build_output_path(
+    input_path: &Path,
+    output_dir: &Path,
+    options: &ConvertOptions,
+    naming_pattern: Option<&str>,
+    profile_name: Option<&str>,
+    sequence_number: usize,
+) -> PathBuf {
+    let original_stem = input_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("image");
+    let format_label = output_extension(options);
+    let output_stem = build_named_stem(
+        original_stem,
+        options.width,
+        options.height,
+        format_label,
+        &options.suffix,
+        naming_pattern,
+        profile_name,
+        sequence_number,
+    );
     let output_filename = format!("{}.{}", output_stem, format_label);
 
     output_dir.join(output_filename)
@@ -273,7 +308,7 @@ fn preset_label_from_suffix(suffix: &str) -> String {
     }
 }
 
-fn sanitize_filename_component(value: &str) -> String {
+pub fn sanitize_filename_component(value: &str) -> String {
     let mut sanitized = String::with_capacity(value.len());
     let mut last_was_separator = false;
 
@@ -301,7 +336,7 @@ fn sanitize_filename_component(value: &str) -> String {
         .to_string()
 }
 
-fn sanitize_suffix_token(value: &str) -> String {
+pub fn sanitize_suffix_token(value: &str) -> String {
     let mut sanitized = String::with_capacity(value.len());
 
     for ch in value.chars() {
@@ -322,7 +357,7 @@ fn sanitize_suffix_token(value: &str) -> String {
         .to_string()
 }
 
-fn slugify_component(value: &str) -> String {
+pub fn slugify_component(value: &str) -> String {
     let mut slug = String::new();
     let mut last_was_dash = false;
 
@@ -364,18 +399,24 @@ fn resize_image(img: &DynamicImage, options: &ConvertOptions) -> DynamicImage {
 }
 
 fn save_image(img: &DynamicImage, path: &Path, options: &ConvertOptions) -> Result<(), String> {
+    let bytes = encode_image_bytes(img, options)?;
+    fs::write(path, bytes).map_err(|e| format!("Errore salvataggio immagine: {}", e))
+}
+
+fn encode_image_bytes(img: &DynamicImage, options: &ConvertOptions) -> Result<Vec<u8>, String> {
+    let resized = resize_image(img, options);
+
     match options.format {
         OutputFormat::WebP => {
-            let rgb = img.to_rgb8();
+            let rgb = resized.to_rgb8();
             let (w, h) = (rgb.width(), rgb.height());
             let encoder = webp::Encoder::from_rgb(rgb.as_raw(), w, h);
             let webp_data = encoder.encode(options.quality as f32);
 
-            fs::write(path, &*webp_data)
-                .map_err(|e| format!("Errore salvataggio WebP: {}", e))
+            Ok(webp_data.to_vec())
         }
         OutputFormat::Jpeg => {
-            let rgb = img.to_rgb8();
+            let rgb = resized.to_rgb8();
             let mut buf = Cursor::new(Vec::new());
             image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, options.quality)
                 .encode(
@@ -386,11 +427,10 @@ fn save_image(img: &DynamicImage, path: &Path, options: &ConvertOptions) -> Resu
                 )
                 .map_err(|e| format!("Errore encoding JPEG: {}", e))?;
 
-            fs::write(path, buf.into_inner())
-                .map_err(|e| format!("Errore salvataggio JPEG: {}", e))
+            Ok(buf.into_inner())
         }
         OutputFormat::Png => {
-            let rgba = img.to_rgba8();
+            let rgba = resized.to_rgba8();
             let mut buf = Cursor::new(Vec::new());
             let encoder = image::codecs::png::PngEncoder::new_with_quality(
                 &mut buf,
@@ -406,11 +446,10 @@ fn save_image(img: &DynamicImage, path: &Path, options: &ConvertOptions) -> Resu
             )
             .map_err(|e| format!("Errore encoding PNG: {}", e))?;
 
-            fs::write(path, buf.into_inner())
-                .map_err(|e| format!("Errore salvataggio PNG: {}", e))
+            Ok(buf.into_inner())
         }
         OutputFormat::Avif => {
-            let rgba = img.to_rgba8();
+            let rgba = resized.to_rgba8();
             let mut buf = Cursor::new(Vec::new());
             let encoder = image::codecs::avif::AvifEncoder::new_with_speed_quality(
                 &mut buf,
@@ -426,8 +465,7 @@ fn save_image(img: &DynamicImage, path: &Path, options: &ConvertOptions) -> Resu
             )
             .map_err(|e| format!("Errore encoding AVIF: {}", e))?;
 
-            fs::write(path, buf.into_inner())
-                .map_err(|e| format!("Errore salvataggio AVIF: {}", e))
+            Ok(buf.into_inner())
         }
     }
 }
@@ -453,4 +491,52 @@ pub fn generate_thumbnail_from_image(
         )
         .map_err(|e| format!("Errore thumbnail: {}", e))?;
     Ok(buf.into_inner())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{ImageBuffer, Rgba};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn now_ms() -> u128 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    }
+
+    fn unique_test_dir(label: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("toolbox-processor-{}-{}", label, now_ms()));
+        fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    fn build_test_job() -> ConvertOptions {
+        ConvertOptions {
+            width: 120,
+            height: 80,
+            quality: 72,
+            format: OutputFormat::WebP,
+            resize_mode: ResizeMode::Cover,
+            suffix: "_hero".to_string(),
+        }
+    }
+
+    #[test]
+    fn estimate_output_size_returns_bytes_for_supported_image() {
+        let dir = unique_test_dir("estimate");
+        let path = dir.join("sample.png");
+        let image = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_pixel(32, 32, Rgba([12, 34, 56, 255]));
+        image.save(&path).expect("save test image");
+
+        let (input_size, estimated_output_size) =
+            estimate_output_size(&path, &build_test_job()).expect("estimate size");
+
+        assert!(input_size > 0);
+        assert!(estimated_output_size > 0);
+
+        let _ = fs::remove_dir_all(dir);
+    }
 }

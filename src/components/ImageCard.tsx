@@ -6,12 +6,36 @@ interface Props {
   selected: boolean;
   onToggle: (path: string) => void;
   formatBytes: (bytes: number) => string;
+  outputName?: string;
+  estimatedOutputSize?: number;
+  jobCount?: number;
+  qualityOverride?: number | null;
 }
 
-function ImageCard({ image, selected, onToggle, formatBytes }: Props) {
+function formatDelta(inputSize: number, outputSize: number): string {
+  if (inputSize <= 0) return "";
+  const delta = Math.round((1 - outputSize / inputSize) * 100);
+  if (delta > 0) return `−${delta}%`;
+  if (delta < 0) return `+${Math.abs(delta)}%`;
+  return "0%";
+}
+
+function ImageCard({
+  image,
+  selected,
+  onToggle,
+  formatBytes,
+  outputName,
+  estimatedOutputSize,
+  jobCount,
+  qualityOverride,
+}: Props) {
   const handleToggle = () => {
     onToggle(image.path);
   };
+
+  const showEstimates = !image.error && estimatedOutputSize != null && estimatedOutputSize > 0;
+  const delta = showEstimates ? formatDelta(image.size, estimatedOutputSize) : "";
 
   return (
     <div
@@ -37,6 +61,11 @@ function ImageCard({ image, selected, onToggle, formatBytes }: Props) {
             onClick={(e) => e.stopPropagation()}
           />
         </div>
+        {qualityOverride != null && (
+          <div className="image-card-quality-badge" title={`Qualità personalizzata: ${qualityOverride}%`}>
+            Q{qualityOverride}
+          </div>
+        )}
       </div>
       <div className="image-card-info">
         <span className="image-card-name" title={image.filename}>
@@ -52,6 +81,25 @@ function ImageCard({ image, selected, onToggle, formatBytes }: Props) {
           )}
           <span className="image-card-format">{image.format}</span>
         </span>
+        {showEstimates && (
+          <div className="image-card-estimate">
+            <span className="estimate-arrow">→</span>
+            <span className="estimate-size">{formatBytes(estimatedOutputSize)}</span>
+            {delta && (
+              <span className={`estimate-delta ${estimatedOutputSize < image.size ? "savings" : "increase"}`}>
+                {delta}
+              </span>
+            )}
+            {jobCount != null && jobCount > 1 && (
+              <span className="estimate-variants">×{jobCount}</span>
+            )}
+          </div>
+        )}
+        {outputName && (
+          <span className="image-card-output-name" title={outputName}>
+            {outputName}
+          </span>
+        )}
       </div>
     </div>
   );

@@ -9,8 +9,10 @@
 - [x] Il modulo e' definito come area suite per automazioni e workflow ripetitivi
 - [x] Esiste gia' una base concreta nel modulo immagini: summary batch + export CSV
 - [-] Drag & drop base presente su Home optimize e modulo optimize, ma non ancora universale a livello app
-- [-] Profili locali salvabili sono disponibili in optimize e WordPress Media; import/export JSON e naming pattern sono gia' attivi, mentre watch folder, batch rename e automazione dedicata restano roadmap
-- [-] Naming pattern e batch rename base sono disponibili nel modulo optimize, ma manca ancora un flusso dedicato di rinomina avanzata
+- [x] `Watch Folder / Automazione` esiste ora come modulo reale della suite, con watcher locale e riuso dei profili optimize
+- [x] Social Media Images e' ora disponibile come modulo reale della suite per template social e batch multi-piattaforma
+- [-] Profili locali salvabili sono disponibili in optimize e WordPress Media; `Social Media Images` oggi persiste le impostazioni del modulo ma non ha ancora profili locali dedicati
+- [x] `Batch Rename` esiste ora come modulo reale con preview naming e rinomina in-place collision-safe
 - [x] Import/export JSON dei profili e' disponibile nel modulo optimize
 - [x] Virtualizzazione reale della griglia e' attiva nel modulo optimize
 - [ ] CLI mode e upload FTP/SFTP non sono ancora presenti
@@ -22,13 +24,13 @@ Modulo per automatizzare e velocizzare il lavoro ripetitivo. Watch folder per co
 
 ## Stato Reale Oggi
 
-- Il prodotto oggi non espone ancora questo modulo come esperienza funzionante.
-- La direzione e' chiara, ma la base attuale resta concentrata sul modulo immagini e sulla shell minima della suite appena introdotta.
+- Il prodotto oggi espone gia' `Social Media Images`, `Watch Folder / Automazione` e `Batch Rename` come esperienze funzionanti.
+- La direzione e' chiara, ma la base attuale resta concentrata sui moduli reali della suite e sulla shell minima introdotta per coordinare i flussi.
 - Una parte del terreno e' gia' pronta: optimize e WordPress Media hanno summary batch, export CSV e profili locali, quindi il filone reportistica/workflow non parte piu' da zero.
 - Anche la rinomina batch non parte piu' da zero: optimize espone un naming pattern con preview e token base, e oggi risolve anche le collisioni deterministiche nello stesso run.
 - Anche il drag & drop ha ora una base concreta nel prodotto reale, ma limitata al percorso Home optimize + modulo optimize.
 - Le funzionalita' qui sotto vanno lette come blocchi di implementazione successivi, da agganciare quando la base modulare sara' stabile.
-- `WordPress Media`, `Srcset Generator` e `Favicon Generator` esistono ora come moduli reali della suite; il prossimo modulo dopo questo step diventa `Social Media Images`.
+- `WordPress Media`, `Srcset Generator`, `Favicon Generator`, `Social Media Images`, `Watch Folder / Automazione` e `Batch Rename` esistono ora come moduli reali della suite; il prossimo modulo dopo questo step diventa `Team & Brand`.
 
 ---
 
@@ -75,6 +77,8 @@ Cartella sorvegliata che processa automaticamente i file appena vengono aggiunti
 5. Opzionalmente sposta gli originali in una sottocartella "Processati"
 
 **Use case tipico:** Fotografo scarica foto da camera → salva in cartella sorvegliata → automaticamente ottimizzate per il web.
+
+**Stato reale del primo cut:** oggi il modulo `Automazione` e' gia' live nella suite. Supporta cartella watch locale, output path, scelta tra ultime impostazioni optimize o profilo locale optimize, toggle `recursive`, toggle `move processed` e storico recente dei job. Restano roadmap le notifiche desktop, la coda avanzata e il controllo multi-watch.
 
 ### Profili Salvabili per Cliente/Progetto
 
@@ -144,6 +148,8 @@ Preview: foto-ristorante-1920x600.webp
 - **Contatore**: numera progressivamente i file
 
 **Preview live**: tabella che mostra nome originale → nome risultante per ogni file, prima di applicare.
+
+**Stato reale del primo cut:** oggi il modulo `Batch Rename` e' gia' live nella suite. Carica immagini/cartelle, genera un'anteprima naming reale dal backend, risolve collisioni con suffissi `-001`, `-002`, ecc., e applica la rinomina in-place con passaggio temporaneo per evitare conflitti tra file dello stesso batch. Restano roadmap i token avanzati, il supporto file non-image e l'export report dedicato della rinomina.
 
 ### Export Report
 
@@ -247,9 +253,9 @@ Dopo la conversione, upload diretto al server del cliente.
 | Feature | Crate/Lib | Complessita' |
 |---------|-----------|-------------|
 | Drag & Drop | Tauri `ondragdrop` | Parziale |
-| Watch Folder | `notify` crate (filesystem watcher) | Roadmap |
+| Watch Folder | `notify` crate (filesystem watcher) | Implementato (primo cut) |
 | Profili | `serde_json` in `settings.json` locale + export/import JSON | Parziale |
-| Batch Rename | String template + token naming | Parziale |
+| Batch Rename | String template + preview backend + rename a due fasi | Implementato (primo cut) |
 | Export CSV | `csv` crate | Implementato in optimize |
 | Export PDF | `printpdf` o `genpdf` crate | Roadmap |
 | CLI Mode | `clap` crate | Roadmap |

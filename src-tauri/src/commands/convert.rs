@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tauri::Emitter;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ConvertJob {
     pub width: u32,
     pub height: u32,
@@ -19,13 +19,27 @@ pub struct ConvertJob {
     pub suffix: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ConvertRequest {
     pub files: Vec<String>,
     pub jobs: Vec<ConvertJob>,
     pub output_dir: Option<String>,
     pub naming_pattern: Option<String>,
     pub profile_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EstimateOutputSizeRequest {
+    pub path: String,
+    pub job: ConvertJob,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EstimateOutputSizeResult {
+    pub path: String,
+    pub input_size: u64,
+    pub estimated_output_size: u64,
+    pub estimated_savings_percent: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -88,11 +102,39 @@ fn parse_job(job: &ConvertJob) -> ConvertOptions {
     ConvertOptions {
         width: job.width,
         height: job.height,
-        quality: job.quality,
+        quality: normalize_quality(job.quality),
         format,
         resize_mode,
         suffix: job.suffix.clone(),
     }
+}
+
+fn normalize_quality(quality: u8) -> u8 {
+    quality.clamp(1, 100)
+}
+
+fn parse_requested_file_spec(file_spec: &str) -> (String, Option<u8>) {
+    let trimmed = file_spec.trim();
+
+    for separator in ['|', '?'] {
+        if let Some((path_part, meta_part)) = trimmed.rsplit_once(separator) {
+            let meta = meta_part.trim();
+            let quality_value = meta
+                .strip_prefix("quality=")
+                .or_else(|| meta.strip_prefix("q="));
+
+            if let Some(quality_value) = quality_value {
+                if let Ok(quality) = quality_value.trim().parse::<u8>() {
+                    let path = path_part.trim();
+                    if !path.is_empty() {
+                        return (path.to_string(), Some(normalize_quality(quality)));
+                    }
+                }
+            }
+        }
+    }
+
+    (trimmed.to_string(), None)
 }
 
 fn resolve_output_dir(
@@ -145,6 +187,7 @@ fn save_conversion_settings(
 
 fn emit_progress(
     app_handle: &tauri::AppHandle,
+    emit_events: bool,
     current: usize,
     total: usize,
     filename: String,
@@ -152,6 +195,10 @@ fn emit_progress(
     input_size: u64,
     output_size: u64,
 ) {
+    if !emit_events {
+        return;
+    }
+
     let _ = app_handle.emit(
         "convert-progress",
         ConvertProgress {
@@ -193,28 +240,36 @@ fn plan_conversion_batches(
     let mut planned_batches = Vec::with_capacity(files.len());
 
     for file_path in files {
-        let input_path = PathBuf::from(file_path);
+        let (resolved_file_path, quality_override) = parse_requested_file_spec(file_path);
+        let input_path = PathBuf::from(&resolved_file_path);
         let mut planned_jobs = Vec::with_capacity(options.len());
 
         for job in options {
             sequence_number += 1;
+            let planned_job = match quality_override {
+                Some(quality) => ConvertOptions {
+                    quality,
+                    ..job.clone()
+                },
+                None => job.clone(),
+            };
             let candidate = processor::build_output_path(
                 &input_path,
                 output_dir,
-                job,
+                &planned_job,
                 naming_pattern,
                 profile_name,
                 sequence_number,
             );
             let output_path = resolve_unique_output_path(candidate, &mut assigned_paths);
             planned_jobs.push(PlannedConvertJob {
-                job: job.clone(),
+                job: planned_job,
                 output_path,
             });
         }
 
         planned_batches.push(PlannedFileBatch {
-            file_path: file_path.clone(),
+            file_path: resolved_file_path,
             planned_jobs,
         });
     }
@@ -228,6 +283,7 @@ fn process_file_batch(
     progress: &Arc<AtomicUsize>,
     total: usize,
     app_handle: &tauri::AppHandle,
+    emit_events: bool,
 ) -> Vec<FileResult> {
     let path = PathBuf::from(file_path);
     let filename = path
@@ -247,6 +303,7 @@ fn process_file_batch(
                     let current = progress.fetch_add(1, Ordering::SeqCst) + 1;
                     emit_progress(
                         app_handle,
+                        emit_events,
                         current,
                         total,
                         output_path_str.clone(),
@@ -278,6 +335,7 @@ fn process_file_batch(
                     let current = progress.fetch_add(1, Ordering::SeqCst) + 1;
                     emit_progress(
                         app_handle,
+                        emit_events,
                         current,
                         total,
                         output_path_str.clone(),
@@ -307,6 +365,7 @@ fn process_file_batch(
             let current = progress.load(Ordering::SeqCst);
             emit_progress(
                 app_handle,
+                emit_events,
                 current,
                 total,
                 output_path_str.clone(),
@@ -319,6 +378,7 @@ fn process_file_batch(
                     let current = progress.fetch_add(1, Ordering::SeqCst) + 1;
                     emit_progress(
                         app_handle,
+                        emit_events,
                         current,
                         total,
                         result.output_path.clone(),
@@ -341,6 +401,7 @@ fn process_file_batch(
                     let current = progress.fetch_add(1, Ordering::SeqCst) + 1;
                     emit_progress(
                         app_handle,
+                        emit_events,
                         current,
                         total,
                         output_path_str,
@@ -364,10 +425,11 @@ fn process_file_batch(
         .collect()
 }
 
-#[tauri::command]
-pub async fn convert_images(
+pub fn execute_convert_request(
     app_handle: tauri::AppHandle,
-    request: ConvertRequest,
+    request: &ConvertRequest,
+    emit_events: bool,
+    persist_settings: bool,
 ) -> Result<ConvertSummary, String> {
     let output_dir = resolve_output_dir(&app_handle, &request.output_dir)?;
     fs::create_dir_all(&output_dir)
@@ -399,6 +461,7 @@ pub async fn convert_images(
                     &progress,
                     total,
                     &app_handle,
+                    emit_events,
                 )
             }
         })
@@ -419,12 +482,14 @@ pub async fn convert_images(
         .map(|result| result.output_size)
         .sum();
 
-    save_conversion_settings(
-        &app_handle,
-        &output_dir,
-        &all_options,
-        request.naming_pattern.as_deref(),
-    );
+    if persist_settings {
+        save_conversion_settings(
+            &app_handle,
+            &output_dir,
+            &all_options,
+            request.naming_pattern.as_deref(),
+        );
+    }
 
     Ok(ConvertSummary {
         total_files: request.files.len(),
@@ -437,10 +502,43 @@ pub async fn convert_images(
     })
 }
 
+#[tauri::command]
+pub async fn convert_images(
+    app_handle: tauri::AppHandle,
+    request: ConvertRequest,
+) -> Result<ConvertSummary, String> {
+    execute_convert_request(app_handle, &request, true, true)
+}
+
+#[tauri::command]
+pub async fn estimate_output_size(
+    request: EstimateOutputSizeRequest,
+) -> Result<EstimateOutputSizeResult, String> {
+    let path = Path::new(&request.path);
+    let options = parse_job(&request.job);
+    let (input_size, estimated_output_size) =
+        processor::estimate_output_size(path, &options)?;
+    let estimated_savings_percent = if input_size == 0 || estimated_output_size >= input_size {
+        0.0
+    } else {
+        ((1.0 - (estimated_output_size as f64 / input_size as f64)) * 100.0).max(0.0)
+    };
+
+    Ok(EstimateOutputSizeResult {
+        path: request.path,
+        input_size,
+        estimated_output_size,
+        estimated_savings_percent,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::{Rgba, RgbaImage};
     use crate::processing::processor::{OutputFormat, ResizeMode};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn build_job(width: u32, height: u32, suffix: &str) -> ConvertOptions {
         ConvertOptions {
@@ -451,6 +549,24 @@ mod tests {
             resize_mode: ResizeMode::Cover,
             suffix: suffix.to_string(),
         }
+    }
+
+    fn now_ms() -> u128 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    }
+
+    fn unique_test_dir(label: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("toolbox-convert-{}-{}", label, now_ms()));
+        fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    fn write_test_image(path: &Path) {
+        let image = RgbaImage::from_pixel(1, 1, Rgba([255, 0, 0, 255]));
+        image.save(path).expect("save test image");
     }
 
     #[test]
@@ -506,5 +622,33 @@ mod tests {
                 "/tmp/out/hero-hero-001.webp".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn applies_quality_overrides_per_file() {
+        let dir = unique_test_dir("quality");
+        let first = dir.join("first.png");
+        let second = dir.join("second.png");
+        write_test_image(&first);
+        write_test_image(&second);
+
+        let jobs = vec![build_job(1200, 630, "_hero")];
+        let planned = plan_conversion_batches(
+            &[
+                format!("{}|quality=60", first.to_string_lossy()),
+                format!("{}|quality=80", second.to_string_lossy()),
+            ],
+            &jobs,
+            Path::new("/tmp/out"),
+            Some("{slug}-{preset}"),
+            Some("Cliente Uno"),
+        );
+
+        assert_eq!(planned[0].planned_jobs[0].job.quality, 60);
+        assert_eq!(planned[1].planned_jobs[0].job.quality, 80);
+        assert_eq!(planned[0].file_path, first.to_string_lossy().to_string());
+        assert_eq!(planned[1].file_path, second.to_string_lossy().to_string());
+
+        let _ = fs::remove_dir_all(dir);
     }
 }

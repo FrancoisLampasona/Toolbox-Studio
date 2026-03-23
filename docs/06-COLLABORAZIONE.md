@@ -9,24 +9,26 @@
 - [x] La base `Toolbox Creative Studio` con il modulo `optimize` e' gia' la fondazione reale del progetto.
 - [x] I profili locali esistono gia' nel modulo `optimize`, ma restano solo locali.
 - [x] I profili locali ora sono anche esportabili/importabili in JSON, base utile per la futura condivisione.
-- [ ] `Team & Brand` non e' ancora implementato come modulo operativo.
-- [ ] Non esistono ancora brand kit, profili condivisi, log attivita' o localizzazione reale.
-- [-] Il documento descrive la direzione futura e le priorita', non lo stato del prodotto già pronto.
+- [x] `Social Media Images` e' gia' un modulo reale della suite e copre i template social multi-piattaforma.
+- [x] `Team & Brand` e' ora implementato come modulo operativo della suite.
+- [x] Esiste un primo layer reale di brand kit locali con CRUD e persistenza minima.
+- [ ] Profili condivisi, log attivita' e localizzazione reale restano non implementati.
+- [-] Il documento ora descrive sia il layer brand gia' reale sia la parte collaborativa ancora futura.
 
 ## Checklist Di Avanzamento
 
 - [x] Separata la visione collaborativa dal prodotto attuale.
 - [x] Mantenuta la coerenza con il naming Toolbox Creative Studio.
 - [x] Distinti profili locali gia' esistenti da profili condivisi ancora futuri.
-- [ ] Definire lo storage minimo per brand kit e profili.
-- [ ] Stabilire cosa deve essere condiviso davvero nella prima versione.
+- [x] Definito lo storage minimo per brand kit locali.
+- [x] Stabilito il primo perimetro condivisibile: palette, font, logo, icona e watermark.
 - [ ] Progettare log attivita' e multi-lingua senza appesantire la suite iniziale.
 
 ---
 
 ## Descrizione
 
-Funzionalita' per l'uso aziendale multi-utente. Al momento questa e' ancora una roadmap: il prodotto reale e' la base `Toolbox Creative Studio / optimize` con shell minima gia' presente e profili locali gia' funzionanti, quindi qui teniamo separati in modo netto il presente e il futuro condiviso.
+Funzionalita' per l'uso aziendale multi-utente. Oggi il primo passo reale esiste: `Team & Brand` e' un modulo live con brand kit locali, e `Social Media Images` puo' gia' consumarli come sorgente automatica di base. Restano invece future la condivisione vera multiutente, i log e la localizzazione.
 
 ---
 
@@ -69,7 +71,7 @@ Kit centralizzato con tutti gli asset del brand, utilizzabile da tutti i moduli.
 **Utilizzo cross-modulo:**
 - **Watermark**: usa il logo del brand kit come watermark predefinito
 - **Filtri**: i filtri "Brand Warm" / "Brand Cool" usano i colori del kit
-- **Template social**: colori e font dal kit applicati automaticamente
+- **Social Media Images**: oggi usa preset locali e zone di layout; domani eredita colori, font e logo dal brand kit
 - **Favicon**: genera favicon dal logo del kit
 
 **Import/Export:**
@@ -155,7 +157,7 @@ Registro locale di tutte le operazioni effettuate.
 
 ### Template Social Media
 
-Dimensioni e layout predefiniti per tutti i social.
+Dimensioni e layout predefiniti per tutti i social. Questa parte e' oggi un modulo reale della suite (`Social Media Images`): qui documentiamo il ponte con il futuro Brand Kit, non una semplice idea roadmap.
 
 **Preset per piattaforma:**
 
@@ -186,6 +188,7 @@ Dimensioni e layout predefiniti per tutti i social.
 - Zone predefinite per posizionare testo e logo
 - Applicazione colori e font dal Brand Kit
 - Batch: genera stessa immagine per tutti i social in un click
+- Il modulo reale usa gia' preset locali e naming coerente; il Brand Kit futuro servira' a sostituire i valori hardcoded con token condivisi.
 
 ### Multi-Lingua
 
@@ -239,11 +242,13 @@ Supporto multilingua per l'intera interfaccia.
 ### Presente
 
 - Nessun sistema collaborativo e nessun brand kit sono pronti nel codice attuale.
-- La suite oggi vive sul modulo optimize e sulla sua base backend.
+- La suite oggi vive sui moduli `optimize` e `Social Media Images`, con una base backend condivisa.
+- Il modulo social esiste gia' come esperienza reale; il brand kit e la collaborazione dovranno alimentarlo in un secondo passaggio.
 
 ### Roadmap
 
 - Brand kit con asset condivisi.
 - Profili condivisi tra colleghi.
 - Log attivita' locale.
-- Template social e localizzazione.
+- Integrazione profonda dei template social con il brand kit.
+- Localizzazione reale.

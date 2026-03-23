@@ -78,6 +78,18 @@ export interface ConvertSummary {
   results: FileResult[];
 }
 
+export interface EstimateConvertRequest {
+  path: string;
+  job: ConvertJob;
+}
+
+export interface EstimateConvertResult {
+  path: string;
+  input_size: number;
+  estimated_output_size: number;
+  estimated_savings_percent: number;
+}
+
 export type OutputFormat = "webp" | "jpeg" | "png" | "avif";
 export type ResizeMode = "cover" | "fit";
 
@@ -240,6 +252,250 @@ export interface FaviconModuleSettings {
   includeAppleTouch: boolean;
   includeIco: boolean;
   includeAndroidIcons: boolean;
+  includeSafariPinnedTab?: boolean;
+  maskIconColor?: string;
+  includeBrowserconfig?: boolean;
+}
+
+export interface SocialMediaModuleSettings {
+  selectedVariantIds: string[];
+  namingPattern: string;
+  assetPath: string;
+  altText: string;
+  format: OutputFormat;
+  quality: number;
+  resizeMode: ResizeMode;
+  selectedBrandKitId?: string | null;
+}
+
+export interface AutomationModuleSettings {
+  watchPath: string | null;
+  outputPath: string | null;
+  selectedProfileId: string | null;
+  recursive: boolean;
+  moveProcessed: boolean;
+  processedDirName: string;
+}
+
+export interface BatchRenameModuleSettings {
+  namingPattern: string;
+  startIndex: number;
+}
+
+export interface VideoModuleSettings {
+  selectedPresetId: string;
+  outputPath: string | null;
+  muteAudio: boolean;
+  extractFrameAt: number;
+}
+
+export interface BrandKit {
+  id: string;
+  name: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  textColor: string;
+  backgroundColor: string;
+  logoPath: string;
+  iconPath: string;
+  fontHeading: string;
+  fontBody: string;
+  watermarkPath: string;
+  updatedAtMs: number;
+}
+
+export interface SaveBrandKitRequest {
+  id?: string | null;
+  name: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  textColor: string;
+  backgroundColor: string;
+  logoPath: string | null;
+  iconPath: string | null;
+  fontHeading: string;
+  fontBody: string;
+  watermarkPath: string | null;
+}
+
+export interface BrandModuleSettings {
+  selectedBrandKitId: string | null;
+  lastOutputPath?: string | null;
+}
+
+export interface BrandKitExportEntry {
+  name: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  textColor: string;
+  backgroundColor: string;
+  logoPath: string | null;
+  iconPath: string | null;
+  fontHeading: string;
+  fontBody: string;
+  watermarkPath: string | null;
+}
+
+export interface ExportBrandKitsRequest {
+  destinationPath: string;
+  kitIds: string[];
+}
+
+export interface ImportBrandKitsRequest {
+  sourcePaths: string[];
+}
+
+export interface BrandKitsExportDocument {
+  version: number;
+  exportedAt: number;
+  kits: BrandKitExportEntry[];
+}
+
+export interface BrandKitImportFailure {
+  sourcePath: string;
+  error: string;
+}
+
+export interface ImportBrandKitsResult {
+  kits: BrandKit[];
+  importedKits: BrandKit[];
+  importedCount: number;
+  failedFiles: BrandKitImportFailure[];
+}
+
+export interface StartWatchFolderRequest {
+  watchPath: string;
+  outputPath: string;
+  selectedProfileId: string | null;
+  recursive: boolean;
+  moveProcessed: boolean;
+  processedDirName: string;
+}
+
+export interface WatchFolderJob {
+  sourcePath: string;
+  outputDir: string;
+  status: string;
+  processedAt: number;
+  outputCount: number;
+  error: string | null;
+}
+
+export interface WatchFolderStatus {
+  active: boolean;
+  watchPath: string | null;
+  outputPath: string | null;
+  selectedProfileId: string | null;
+  recursive: boolean;
+  moveProcessed: boolean;
+  processedDirName: string;
+  queueLength: number;
+  processing: boolean;
+  processedCount: number;
+  startedAt: number | null;
+  lastError: string | null;
+  recentJobs: WatchFolderJob[];
+}
+
+export interface PreviewBatchRenameRequest {
+  paths: string[];
+  namingPattern?: string | null;
+  startIndex?: number | null;
+}
+
+export interface RenamePlanItem {
+  sourcePath: string;
+  sourceName: string;
+  targetPath: string;
+  targetName: string;
+  width: number;
+  height: number;
+  format: string;
+  changed: boolean;
+  collisionResolved: boolean;
+  error: string | null;
+}
+
+export interface ApplyBatchRenameRequest {
+  items: RenamePlanItem[];
+}
+
+export interface RenameResultItem {
+  sourcePath: string;
+  sourceName: string;
+  targetPath: string;
+  targetName: string;
+  changed: boolean;
+  collisionResolved: boolean;
+  success: boolean;
+  error: string | null;
+}
+
+export interface RenameSummary {
+  totalFiles: number;
+  renamed: number;
+  unchanged: number;
+  failed: number;
+  collisionsResolved: number;
+  results: RenameResultItem[];
+}
+
+export interface VideoPreset {
+  id: string;
+  label: string;
+  description: string;
+  crf: number;
+  audioBitrateKbps: number;
+}
+
+export interface VideoToolStatus {
+  installed: boolean;
+  binaryPath: string | null;
+  version: string | null;
+  message: string | null;
+}
+
+export interface CompressVideoRequest {
+  inputPath: string;
+  outputPath?: string | null;
+  outputDir?: string | null;
+  preset?: string | null;
+  overwrite?: boolean | null;
+}
+
+export interface CompressVideoResult {
+  inputPath: string;
+  outputPath: string;
+  preset: string;
+  presetLabel: string;
+  crf: number;
+  ffmpegPreset: string;
+  inputSize: number;
+  outputSize: number;
+  savedBytes: number;
+  savingsPercent: number;
+  durationMs: number;
+}
+
+export interface ExtractVideoFrameRequest {
+  inputPath: string;
+  outputPath?: string | null;
+  outputDir?: string | null;
+  timestampSeconds?: number | null;
+  imageFormat?: string | null;
+  overwrite?: boolean | null;
+}
+
+export interface ExtractVideoFrameResult {
+  inputPath: string;
+  outputPath: string;
+  timestampSeconds: number;
+  imageFormat: string;
+  bytes: number;
+  durationMs: number;
 }
 
 export interface GenerateFaviconsRequest {
@@ -256,6 +512,9 @@ export interface GenerateFaviconsRequest {
   includeAppleTouch: boolean;
   includeIco: boolean;
   includeAndroidIcons: boolean;
+  includeSafariPinnedTab?: boolean;
+  maskIconColor?: string;
+  includeBrowserconfig?: boolean;
 }
 
 export interface FaviconGeneratedFile {
@@ -273,6 +532,7 @@ export interface GenerateFaviconsResult {
   files: FaviconGeneratedFile[];
   htmlSnippet: string;
   manifestPath: string | null;
+  browserconfigPath?: string | null;
 }
 
 export interface AppSettings {
@@ -285,4 +545,10 @@ export interface AppSettings {
   wordpressProfiles: WordPressProfile[];
   lastSrcsetOptions: SrcsetModuleSettings;
   lastFaviconOptions: FaviconModuleSettings;
+  lastSocialOptions: SocialMediaModuleSettings;
+  lastAutomationOptions: AutomationModuleSettings;
+  lastBatchRenameOptions: BatchRenameModuleSettings;
+  lastVideoOptions: VideoModuleSettings;
+  brandKits?: BrandKit[];
+  lastBrandOptions?: BrandModuleSettings;
 }

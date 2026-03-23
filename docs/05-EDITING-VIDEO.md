@@ -7,24 +7,26 @@
 ## Stato Reale Oggi
 
 - [x] La base `Toolbox Creative Studio`, la shell minima e il primo modulo `optimize` esistono gia' come fondazione reale del progetto.
-- [ ] `Video Tools` non e' ancora implementato nel frontend o nel backend.
-- [ ] Non esiste ancora integrazione FFmpeg, non esiste ancora transcodifica, non esiste ancora estrazione frame.
-- [-] Le specifiche qui sotto sono intenzionali e utili per la roadmap, ma non vanno lette come funzionalita' gia' pronte.
+- [x] `Video Tools` e' ora implementato nel frontend e nel backend come modulo reale della suite.
+- [x] Esiste integrazione FFmpeg di sistema con stato/guidance lato UI.
+- [x] Esistono gia' compressione batch video web, target per-file 60/70/80/90 ed estrazione poster frame.
+- [-] Le specifiche qui sotto descrivono insieme il MVP gia' presente e la roadmap avanzata successiva.
 
 ## Checklist Di Avanzamento
 
 - [x] Delineato il perimetro funzionale del futuro modulo video.
 - [x] Distinto chiaramente il presente della suite dalla roadmap video.
-- [ ] Definire il primo MVP video da costruire dopo la base optimize.
-- [ ] Stabilire strategia FFmpeg di sistema vs bundled.
-- [ ] Implementare backend Tauri per compressione e resize.
-- [ ] Aggiungere UI per preset video e progress reale.
+- [x] Definito e costruito un primo MVP video dopo la base optimize.
+- [x] Stabilita la strategia iniziale: FFmpeg di sistema con guidance installazione.
+- [x] Implementato backend Tauri per compressione video e frame extraction.
+- [x] Aggiunta UI per preset video, peso finale stimato/reale e gestione batch.
+- [ ] Resize social, trim/cut, GIF/WebP animato e sottotitoli restano roadmap.
 
 ---
 
 ## Descrizione
 
-Strumenti per lavorare con i video nel contesto web e social media. Questo modulo e' ancora roadmap: oggi l'app reale si ferma alla base `Toolbox Creative Studio / optimize`, quindi questa sezione serve a descrivere la direzione futura senza confonderla con lo stato corrente.
+Strumenti per lavorare con i video nel contesto web e social media. Oggi esiste un primo MVP reale: carichi piu' video, assegni a ogni file un target diverso, scegli l'output, controlli FFmpeg ed estrai un poster frame dal file attivo. Le sezioni piu' avanti descrivono invece le estensioni ancora future.
 
 ---
 
@@ -224,14 +226,13 @@ FFmpeg viene utilizzato come backend per tutte le operazioni video. Due approcci
 
 ### Presente
 
-- La suite ha solo la base optimize come modulo realmente costruito.
-- Nessun comando video e nessuna UI video sono presenti ancora.
+- `Video Tools` e' un modulo reale della suite.
+- FFmpeg viene usato come dipendenza di sistema, con check stato e messaggio guida se manca.
+- La UI permette batch multi-file, target per-file `60% / 70% / 80% / 90%`, peso finale stimato/reale ed estrazione poster frame.
 
 ### Roadmap
 
-- Compressione video web.
 - Resize per social.
-- Frame extraction e thumbnail poster.
 - GIF/WebP animato, trim/cut e sottotitoli burn-in.
 
 | Feature | Comando FFmpeg | Complessita' |

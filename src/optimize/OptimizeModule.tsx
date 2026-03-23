@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -8,6 +8,7 @@ import type {
   ConvertJob,
   ConvertProgress,
   ConvertSummary,
+  EstimateConvertResult,
   ExportOptimizeProfilesRequest,
   ImageInfo,
   ImportOptimizeProfilesResult,
@@ -173,6 +174,26 @@ function stemFromFilename(filename: string): string {
   return filename.slice(0, dotIndex);
 }
 
+function basename(path: string | null): string {
+  if (!path) {
+    return "Nessuna cartella scelta";
+  }
+
+  const segments = path.split(/[/\\]/).filter(Boolean);
+  return segments[segments.length - 1] || path;
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 B";
+  }
+
+  const units = ["B", "KB", "MB", "GB"];
+  const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  const value = bytes / Math.pow(1024, index);
+  return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
 function buildNamingPreview({
   pattern,
   filename,
@@ -218,6 +239,34 @@ function buildNamingPreview({
   return `${safeStem}.${extension}`;
 }
 
+function estimateJobOutputBytes(image: ImageInfo, job: ConvertJob): number {
+  const sourcePixels = Math.max(1, image.width * image.height);
+  const targetPixels = Math.max(1, job.width * job.height);
+  const pixelRatio = Math.min(1, targetPixels / sourcePixels);
+  const formatFactor = {
+    webp: 0.36,
+    avif: 0.28,
+    jpeg: 0.48,
+    png: 0.92,
+  }[job.format] ?? 0.42;
+  const qualityFactor = 0.55 + job.quality / 180;
+  const resizeFactor = job.resize_mode === "cover" ? Math.max(pixelRatio, 0.14) : Math.max(pixelRatio, 0.1);
+  const encoded = image.size * formatFactor * qualityFactor * resizeFactor;
+
+  return Math.max(1024, Math.round(encoded));
+}
+
+function sumEstimatedJobOutputs(image: ImageInfo, jobs: ConvertJob[]): number {
+  return jobs.reduce((total, job) => total + estimateJobOutputBytes(image, job), 0);
+}
+
+function getJobsWithQuality(jobs: ConvertJob[], quality: number): ConvertJob[] {
+  return jobs.map((job) => ({
+    ...job,
+    quality,
+  }));
+}
+
 export default function OptimizeModule({
   active,
   initialSettings,
@@ -236,6 +285,7 @@ export default function OptimizeModule({
   const [useCustom, setUseCustom] = useState(DEFAULT_OPTIMIZE_SETTINGS.useCustom);
   const [format, setFormat] = useState<OutputFormat>(DEFAULT_OPTIMIZE_SETTINGS.format);
   const [quality, setQuality] = useState(DEFAULT_OPTIMIZE_SETTINGS.quality);
+  const [fileQualityOverrides, setFileQualityOverrides] = useState<Record<string, number>>({});
   const [resizeMode, setResizeMode] = useState<ResizeMode>(DEFAULT_OPTIMIZE_SETTINGS.resizeMode);
   const [namingPattern, setNamingPattern] = useState(DEFAULT_OPTIMIZE_SETTINGS.namingPattern);
   const [inputPaths, setInputPaths] = useState<string[]>([]);
@@ -250,6 +300,10 @@ export default function OptimizeModule({
   const [exportingReport, setExportingReport] = useState(false);
   const [reportStatus, setReportStatus] = useState<string | null>(null);
   const [reportStatusTone, setReportStatusTone] = useState<"success" | "error" | null>(null);
+  const [previewEstimate, setPreviewEstimate] = useState<{
+    inputSize: number;
+    outputSize: number;
+  } | null>(null);
   const [profiles, setProfiles] = useState<OptimizeProfile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [profileName, setProfileName] = useState("");
@@ -280,6 +334,46 @@ export default function OptimizeModule({
   const updateThumbnailProgress = useCallback((nextImages: ImageInfo[], currentPath: string | null = null) => {
     setThumbnailProgress(buildThumbnailProgress(nextImages, currentPath, thumbFailedRef.current));
   }, []);
+
+  const getQualityForPath = useCallback(
+    (path: string) => fileQualityOverrides[path] ?? quality,
+    [fileQualityOverrides, quality]
+  );
+
+  const setPreviewQuality = useCallback(
+    (nextQuality: number) => {
+      if (!previewImage) {
+        return;
+      }
+
+      setFileQualityOverrides((current) => {
+        const next = { ...current };
+        if (nextQuality === quality) {
+          delete next[previewImage.path];
+        } else {
+          next[previewImage.path] = nextQuality;
+        }
+        return next;
+      });
+    },
+    [previewImage, quality]
+  );
+
+  const resetPreviewQuality = useCallback(() => {
+    if (!previewImage) {
+      return;
+    }
+
+    setFileQualityOverrides((current) => {
+      if (!(previewImage.path in current)) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[previewImage.path];
+      return next;
+    });
+  }, [previewImage]);
 
   const resetThumbnailState = useCallback(() => {
     thumbQueueRef.current = [];
@@ -423,6 +517,26 @@ export default function OptimizeModule({
 
   useEffect(() => {
     imagesRef.current = images;
+  }, [images]);
+
+  useEffect(() => {
+    setFileQualityOverrides((current) => {
+      if (Object.keys(current).length === 0) {
+        return current;
+      }
+
+      const validPaths = new Set(images.map((image) => image.path));
+      let changed = false;
+      const nextEntries = Object.entries(current).filter(([path]) => {
+        const keep = validPaths.has(path);
+        if (!keep) {
+          changed = true;
+        }
+        return keep;
+      });
+
+      return changed ? Object.fromEntries(nextEntries) : current;
+    });
   }, [images]);
 
   useEffect(() => {
@@ -821,6 +935,7 @@ export default function OptimizeModule({
       if (!selected) {
         return;
       }
+
       await invoke("open_output_folder", { path: selected });
       return;
     }
@@ -878,6 +993,7 @@ export default function OptimizeModule({
     setImages([]);
     setSelectedFiles(new Set());
     setPreviewImage(null);
+    setFileQualityOverrides({});
   };
 
   const clearInputPaths = () => {
@@ -888,6 +1004,7 @@ export default function OptimizeModule({
     setImages([]);
     setSelectedFiles(new Set());
     setPreviewImage(null);
+    setFileQualityOverrides({});
     setSummary(null);
     setProgress(null);
     setReportStatus(null);
@@ -1205,10 +1322,18 @@ export default function OptimizeModule({
     setReportStatus(null);
     setReportStatusTone(null);
 
+    const requestedFiles = Array.from(selectedFiles).map((path) => {
+      const overrideQuality = fileQualityOverrides[path];
+      if (overrideQuality !== undefined && overrideQuality !== quality) {
+        return `${path}|quality=${overrideQuality}`;
+      }
+      return path;
+    });
+
     try {
       const result = await invoke<ConvertSummary>("convert_images", {
         request: {
-          files: Array.from(selectedFiles),
+          files: requestedFiles,
           jobs,
           output_dir: targetOutput,
           naming_pattern: namingPattern,
@@ -1287,6 +1412,7 @@ export default function OptimizeModule({
   const jobs = buildJobs();
   const jobCount = jobs.length;
   const totalOps = selectedFiles.size * jobCount;
+  const selectedImages = images.filter((image) => selectedFiles.has(image.path) && !image.error);
   const primaryTarget =
     activePresets.size > 0
       ? presets.find((preset) => activePresets.has(`${preset.width}x${preset.height}${preset.suffix}`))
@@ -1297,6 +1423,10 @@ export default function OptimizeModule({
     images.find((image) => !image.error) ||
     images[0] ||
     null;
+  const previewQuality = previewImage ? getQualityForPath(previewImage.path) : quality;
+  const previewQualityOverridden = Boolean(
+    previewImage && Object.prototype.hasOwnProperty.call(fileQualityOverrides, previewImage.path)
+  );
   const previewJob = jobs[0] || {
     width: customWidth,
     height: customHeight,
@@ -1305,6 +1435,39 @@ export default function OptimizeModule({
     resize_mode: resizeMode,
     suffix: "_custom",
   };
+  const activePreviewJobs = getJobsWithQuality(jobs, previewQuality);
+  const previewEstimateKey = previewImage
+    ? [
+        previewImage.path,
+        ...activePreviewJobs.map((job) =>
+          `${job.width}x${job.height}:${job.quality}:${job.format}:${job.resize_mode}:${job.suffix}`
+        ),
+      ].join("|")
+    : "";
+  const activePreviewResults =
+    summary && previewImage
+      ? summary.results.filter((result) => result.source_path === previewImage.path)
+      : [];
+  const activePreviewInputSize =
+    activePreviewResults[0]?.input_size ?? previewEstimate?.inputSize ?? previewImage?.size ?? 0;
+  const activePreviewOutputSize = activePreviewResults.length > 0
+    ? activePreviewResults.reduce((total, result) => total + (result.success ? result.output_size : 0), 0)
+    : previewEstimate?.outputSize ?? (previewImage ? sumEstimatedJobOutputs(previewImage, activePreviewJobs) : 0);
+  const activePreviewWeightMode = activePreviewResults.length > 0 ? "reale" : previewImage ? "stimato" : "idle";
+  const batchEstimatedInputSize = selectedImages.reduce((total, image) => total + image.size, 0);
+  const batchEstimatedOutputSize = selectedImages.reduce((total, image) => {
+    const imageQuality = getQualityForPath(image.path);
+    return total + sumEstimatedJobOutputs(image, getJobsWithQuality(jobs, imageQuality));
+  }, 0);
+  const batchWeightInputSize = summary?.total_input_size ?? batchEstimatedInputSize;
+  const batchWeightOutputSize = summary?.total_output_size ?? batchEstimatedOutputSize;
+  const batchWeightMode = summary ? "reale" : selectedImages.length > 0 ? "stimato" : "idle";
+  const batchWeightNote =
+    batchWeightMode === "reale"
+      ? "Dati reali dalla conversione"
+      : batchWeightMode === "stimato"
+        ? "Stima rapida del batch; il file attivo usa una stima più accurata"
+        : "Seleziona immagini per vedere il peso finale";
   const namingPreview = buildNamingPreview({
     pattern: namingPattern,
     filename: previewSource?.filename || "example-image.jpg",
@@ -1315,6 +1478,123 @@ export default function OptimizeModule({
     sequence: 1,
     profileName: profileName.trim() || activeProfile?.name || null,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!previewImage || activePreviewJobs.length === 0) {
+      setPreviewEstimate(null);
+      return;
+    }
+
+    const estimatePreview = async () => {
+      try {
+        const estimates = await Promise.all(
+          activePreviewJobs.map((job) =>
+            invoke<EstimateConvertResult>("estimate_output_size", {
+              request: {
+                path: previewImage.path,
+                job,
+              },
+            })
+          )
+        );
+
+        if (cancelled) {
+          return;
+        }
+
+        setPreviewEstimate({
+          inputSize: estimates[0]?.input_size ?? previewImage.size,
+          outputSize: estimates.reduce((total, estimate) => total + estimate.estimated_output_size, 0),
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Errore stima peso preview:", error);
+          setPreviewEstimate(null);
+        }
+      }
+    };
+
+    void estimatePreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewEstimateKey]);
+
+  const fileEstimates = useMemo(() => {
+    const map = new Map<string, { outputName: string; estimatedOutputSize: number; jobCount: number; qualityOverride: number | null }>();
+    for (const image of images) {
+      if (image.error) continue;
+      const imageQuality = getQualityForPath(image.path);
+      const imageJobs = getJobsWithQuality(jobs, imageQuality);
+      const firstJob = imageJobs[0];
+      if (!firstJob) continue;
+      const outputName = buildNamingPreview({
+        pattern: namingPattern,
+        filename: image.filename,
+        width: firstJob.width,
+        height: firstJob.height,
+        format,
+        suffix: firstJob.suffix,
+        sequence: 1,
+        profileName: profileName.trim() || activeProfile?.name || null,
+      });
+      const estimatedOutputSize = sumEstimatedJobOutputs(image, imageJobs);
+      const override = Object.prototype.hasOwnProperty.call(fileQualityOverrides, image.path)
+        ? fileQualityOverrides[image.path]
+        : null;
+      map.set(image.path, {
+        outputName,
+        estimatedOutputSize,
+        jobCount: imageJobs.length,
+        qualityOverride: override ?? null,
+      });
+    }
+    return map;
+  }, [images, jobs, namingPattern, format, profileName, activeProfile?.name, fileQualityOverrides, getQualityForPath]);
+
+  const [showPreview, setShowPreview] = useState(false);
+
+  const handleCardToggle = useCallback((path: string) => {
+    toggleSelect(path);
+    const img = imagesRef.current.find((i) => i.path === path);
+    if (img) {
+      setPreviewImage(img);
+    }
+  }, [toggleSelect]);
+
+  const openPreview = useCallback(() => {
+    if (previewImage) setShowPreview(true);
+  }, [previewImage]);
+
+  const activePresetLabels = useMemo(() => {
+    if (useCustom || activePresets.size === 0) {
+      return [`Custom ${customWidth}×${customHeight}`];
+    }
+
+    return presets
+      .filter((preset) => activePresets.has(`${preset.width}x${preset.height}${preset.suffix}`))
+      .map((preset) => preset.name);
+  }, [activePresets, customHeight, customWidth, presets, useCustom]);
+
+  const qualityOverrideCount = Object.keys(fileQualityOverrides).length;
+  const selectedSourceCount = inputPaths.length;
+  const outputLabel = basename(outputPath);
+  const batchModeLabel =
+    batchWeightMode === "reale" ? "Peso reale" : batchWeightMode === "stimato" ? "Peso stimato" : "Nessuna stima";
+  const workspaceStatus = scanning
+    ? scanProgress
+      ? `Scansione ${Math.min(scanProgress.current, scanProgress.total)}/${scanProgress.total}`
+      : "Scansione in corso"
+    : thumbnailProgress && thumbnailProgress.total > 0 && thumbnailProgress.completed < thumbnailProgress.total
+      ? `Anteprime ${thumbnailProgress.completed}/${thumbnailProgress.total}`
+      : loading
+        ? "Conversione in corso"
+        : images.length > 0
+          ? "Sessione pronta"
+          : "Aggiungi file o cartelle per iniziare";
 
   return (
     <div
@@ -1335,7 +1615,7 @@ export default function OptimizeModule({
         </div>
       </div>
 
-      <header className="app-header">
+      <header className="app-header optimize-header">
         <div className="header-brand">
           <button onClick={onBackHome} className="btn-icon btn-back" aria-label="Torna alla Home">
             ←
@@ -1343,10 +1623,15 @@ export default function OptimizeModule({
           <div className="header-logo">C</div>
           <div className="header-brand-copy">
             <h1>Ottimizza<span>Immagini</span></h1>
-            <span className="header-subtitle">Modulo immagini di Toolbox Creative Studio</span>
+            <span className="header-subtitle">Workbench immagini con preview, peso finale e controllo qualità per-file</span>
           </div>
         </div>
-        <div className="header-actions">
+        <div className="header-actions optimize-header-actions">
+          <span className="optimize-status-pill">{images.length} asset</span>
+          <span className="optimize-status-pill">{selectedFiles.size} selezionate</span>
+          <span className={`optimize-status-pill ${batchWeightMode !== "idle" ? "accent" : ""}`}>
+            {batchModeLabel}
+          </span>
           <button onClick={addFiles} className="btn btn-secondary">
             + File
           </button>
@@ -1361,108 +1646,241 @@ export default function OptimizeModule({
             {scanning ? "Scansione..." : "Ricarica"}
           </button>
           <button onClick={() => void chooseOutput()} className="btn btn-secondary">
-            Output...
-          </button>
-          <button onClick={openOutput} className="btn btn-secondary">
-            Apri Output
+            Output
           </button>
         </div>
       </header>
 
-      <ResizableModuleLayout
-        storageKey="toolbox-layout-optimize-v1"
-        defaultLeftWidth={240}
-        defaultRightWidth={280}
-        leftMinWidth={220}
-        leftMaxWidth={420}
-        rightMinWidth={260}
-        rightMaxWidth={440}
-        centerMinWidth={460}
-        left={
-          <PresetPanel
-            presets={presets}
-            activePresets={activePresets}
-            onTogglePreset={togglePreset}
-            customWidth={customWidth}
-            customHeight={customHeight}
-            useCustom={useCustom}
-            onCustomFocus={handleCustomFocus}
-            onCustomWidthChange={setCustomWidth}
-            onCustomHeightChange={setCustomHeight}
-          />
-        }
-        center={
-          <ImageGrid
-            images={images}
-            selectedFiles={selectedFiles}
-            onToggleSelect={toggleSelect}
-            onSelectAll={selectAll}
-            onDeselectAll={deselectAll}
-            onClearAll={clearImages}
-            scanning={scanning}
-          />
-        }
-        right={
-          <>
+      <div className="app optimize-app-shell">
+        <ResizableModuleLayout
+          storageKey="clickoso-layout-optimize-v2"
+          defaultLeftWidth={272}
+          defaultRightWidth={388}
+          leftMinWidth={236}
+          leftMaxWidth={360}
+          rightMinWidth={332}
+          rightMaxWidth={460}
+          centerMinWidth={560}
+          left={
+            <div className="optimize-column optimize-column-presets">
+              <div className="optimize-column-header">
+                <div>
+                  <span className="optimize-column-kicker">Preset</span>
+                  <h2>Varianti e tagli</h2>
+                </div>
+                <span className="optimize-column-badge">
+                  {jobCount} {jobCount === 1 ? "output" : "output"}
+                </span>
+              </div>
+              <p className="optimize-column-copy">
+                Scegli preset o dimensioni custom. Il batch eredita formato, resize mode, naming e qualità
+                globale, con possibilità di override per singolo file.
+              </p>
+              <PresetPanel
+                presets={presets}
+                activePresets={activePresets}
+                onTogglePreset={togglePreset}
+                customWidth={customWidth}
+                customHeight={customHeight}
+                useCustom={useCustom}
+                onCustomFocus={handleCustomFocus}
+                onCustomWidthChange={setCustomWidth}
+                onCustomHeightChange={setCustomHeight}
+              />
+            </div>
+          }
+          center={
+            <div className="optimize-stage">
+              <section className="optimize-stage-hero">
+                <div className="optimize-stage-copy">
+                  <span className="optimize-stage-kicker">Workbench</span>
+                  <h2>Ottimizzazione batch pronta per export web</h2>
+                  <p>
+                    Carica immagini o cartelle, controlla il naming output e verifica subito quanto peserà il
+                    batch finale prima e dopo la conversione.
+                  </p>
+                </div>
+                <div className="optimize-stage-metrics">
+                  <div className="optimize-metric-card">
+                    <span className="optimize-metric-label">Sorgenti</span>
+                    <strong>{selectedSourceCount}</strong>
+                    <span>{images.length} asset caricati</span>
+                  </div>
+                  <div className="optimize-metric-card">
+                    <span className="optimize-metric-label">Selezione</span>
+                    <strong>{selectedFiles.size}</strong>
+                    <span>{selectedFiles.size === 1 ? "file attivo" : "file attivi"}</span>
+                  </div>
+                  <div className="optimize-metric-card">
+                    <span className="optimize-metric-label">Varianti</span>
+                    <strong>{totalOps}</strong>
+                    <span>{jobCount} preset nel batch</span>
+                  </div>
+                  <div className="optimize-metric-card">
+                    <span className="optimize-metric-label">{batchModeLabel}</span>
+                    <strong>{formatBytes(batchWeightOutputSize)}</strong>
+                    <span>{batchWeightMode === "idle" ? "attendi selezione" : "dimensione finale prevista"}</span>
+                  </div>
+                </div>
+              </section>
+
+              <section className="optimize-stage-toolbar">
+                <div className="optimize-stage-chip-row">
+                  <span className="optimize-stage-chip">{workspaceStatus}</span>
+                  <span className="optimize-stage-chip">Output: {outputLabel}</span>
+                  <span className="optimize-stage-chip">
+                    {qualityOverrideCount > 0 ? `${qualityOverrideCount} override qualità` : `Qualità ${quality}%`}
+                  </span>
+                  {activePresetLabels.slice(0, 2).map((label) => (
+                    <span key={label} className="optimize-stage-chip accent">
+                      {label}
+                    </span>
+                  ))}
+                  {activePresetLabels.length > 2 ? (
+                    <span className="optimize-stage-chip">+{activePresetLabels.length - 2} preset</span>
+                  ) : null}
+                </div>
+                <div className="optimize-stage-actions">
+                  <button onClick={() => void chooseOutput()} className="btn btn-secondary">
+                    Scegli output
+                  </button>
+                  <button
+                    onClick={() => void openOutput()}
+                    disabled={!outputPath}
+                    className="btn btn-secondary"
+                  >
+                    Apri output
+                  </button>
+                </div>
+              </section>
+
+              <section className="optimize-stage-panel">
+                <div className="optimize-stage-panel-head">
+                  <div>
+                    <span className="optimize-column-kicker">Libreria batch</span>
+                    <h3>Immagini caricate</h3>
+                  </div>
+                  <span className="optimize-column-badge subtle">
+                    {images.length === 0 ? "Vuota" : `${images.length} elementi`}
+                  </span>
+                </div>
+                <div className="optimize-grid-area">
+                  <ImageGrid
+                    images={images}
+                    selectedFiles={selectedFiles}
+                    onToggleSelect={handleCardToggle}
+                    onSelectAll={selectAll}
+                    onDeselectAll={deselectAll}
+                    onClearAll={clearImages}
+                    scanning={scanning}
+                    fileEstimates={fileEstimates}
+                  />
+                </div>
+              </section>
+            </div>
+          }
+          right={
+            <div className="optimize-column optimize-column-settings">
+              <div className="optimize-preview-shell">
+                <ImagePreview
+                  image={previewImage}
+                  targetWidth={primaryTarget?.width || customWidth}
+                  targetHeight={primaryTarget?.height || customHeight}
+                  resizeMode={resizeMode}
+                />
+                {previewImage ? (
+                  <div className="optimize-preview-actions">
+                    <button className="btn btn-sm" onClick={openPreview}>
+                      Apri anteprima grande
+                    </button>
+                    <span className="optimize-preview-caption" title={previewImage.filename}>
+                      {previewImage.filename}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
+              <SettingsPanel
+                format={format}
+                onFormatChange={setFormat}
+                quality={quality}
+                onQualityChange={setQuality}
+                previewImage={previewImage}
+                previewQuality={previewQuality}
+                previewQualityOverridden={previewQualityOverridden}
+                onPreviewQualityChange={setPreviewQuality}
+                onResetPreviewQuality={resetPreviewQuality}
+                resizeMode={resizeMode}
+                onResizeModeChange={setResizeMode}
+                namingPattern={namingPattern}
+                onNamingPatternChange={setNamingPattern}
+                namingPreview={namingPreview}
+                selectedCount={selectedFiles.size}
+                jobCount={jobCount}
+                totalOps={totalOps}
+                activePresets={activePresets}
+                presets={presets}
+                useCustom={useCustom}
+                customWidth={customWidth}
+                customHeight={customHeight}
+                outputPath={outputPath}
+                inputPaths={inputPaths}
+                inputPathCount={inputPaths.length}
+                profiles={profiles}
+                selectedProfileId={selectedProfileId}
+                profileName={profileName}
+                profileDirty={profileDirty}
+                savingProfile={savingProfile}
+                deletingProfile={deletingProfile}
+                exportingProfiles={exportingProfiles}
+                importingProfiles={importingProfiles}
+                profileStatus={profileStatus}
+                profileStatusTone={profileStatusTone}
+                profileTransferStatus={profileTransferStatus}
+                profileTransferStatusTone={profileTransferStatusTone}
+                onProfileNameChange={setProfileName}
+                onApplyProfile={applyProfile}
+                onSaveNewProfile={() => void persistProfile("create")}
+                onUpdateProfile={() => void persistProfile("update")}
+                onDeleteProfile={() => void deleteSelectedProfile()}
+                onExportProfiles={() => void exportSelectedProfile()}
+                onImportProfiles={() => void importProfiles()}
+                onChooseOutput={() => void chooseOutput()}
+                onClearInputPaths={clearInputPaths}
+                summary={summary}
+                batchWeightMode={batchWeightMode}
+                batchWeightInputSize={batchWeightInputSize}
+                batchWeightOutputSize={batchWeightOutputSize}
+                batchWeightNote={batchWeightNote}
+                activePreviewWeightMode={activePreviewWeightMode}
+                activePreviewInputSize={activePreviewInputSize}
+                activePreviewOutputSize={activePreviewOutputSize}
+                exportingReport={exportingReport}
+                reportStatus={reportStatus}
+                reportStatusTone={reportStatusTone}
+                onExportReport={handleExportReport}
+                onConvert={handleConvert}
+                loading={loading}
+              />
+            </div>
+          }
+        />
+      </div>
+
+      {/* Preview overlay */}
+      {showPreview && previewImage && (
+        <div className="preview-overlay" onClick={() => setShowPreview(false)}>
+          <div className="preview-overlay-content" onClick={(e) => e.stopPropagation()}>
+            <button className="preview-overlay-close" onClick={() => setShowPreview(false)}>✕</button>
             <ImagePreview
               image={previewImage}
               targetWidth={primaryTarget?.width || customWidth}
               targetHeight={primaryTarget?.height || customHeight}
               resizeMode={resizeMode}
             />
-            <SettingsPanel
-              format={format}
-              onFormatChange={setFormat}
-              quality={quality}
-              onQualityChange={setQuality}
-              resizeMode={resizeMode}
-              onResizeModeChange={setResizeMode}
-              namingPattern={namingPattern}
-              onNamingPatternChange={setNamingPattern}
-              namingPreview={namingPreview}
-              selectedCount={selectedFiles.size}
-              jobCount={jobCount}
-              totalOps={totalOps}
-              activePresets={activePresets}
-              presets={presets}
-              useCustom={useCustom}
-              customWidth={customWidth}
-              customHeight={customHeight}
-              outputPath={outputPath}
-              inputPaths={inputPaths}
-              inputPathCount={inputPaths.length}
-              profiles={profiles}
-              selectedProfileId={selectedProfileId}
-              profileName={profileName}
-              profileDirty={profileDirty}
-              savingProfile={savingProfile}
-              deletingProfile={deletingProfile}
-              exportingProfiles={exportingProfiles}
-              importingProfiles={importingProfiles}
-              profileStatus={profileStatus}
-              profileStatusTone={profileStatusTone}
-              profileTransferStatus={profileTransferStatus}
-              profileTransferStatusTone={profileTransferStatusTone}
-              onProfileNameChange={setProfileName}
-              onApplyProfile={applyProfile}
-              onSaveNewProfile={() => void persistProfile("create")}
-              onUpdateProfile={() => void persistProfile("update")}
-              onDeleteProfile={() => void deleteSelectedProfile()}
-              onExportProfiles={() => void exportSelectedProfile()}
-              onImportProfiles={() => void importProfiles()}
-              onChooseOutput={() => void chooseOutput()}
-              onClearInputPaths={clearInputPaths}
-              summary={summary}
-              exportingReport={exportingReport}
-              reportStatus={reportStatus}
-              reportStatusTone={reportStatusTone}
-              onExportReport={() => void handleExportReport()}
-              onConvert={handleConvert}
-              loading={loading}
-            />
-          </>
-        }
-      />
+          </div>
+        </div>
+      )}
 
       <footer className="app-footer">
         <BatchProgress
