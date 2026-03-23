@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+src-tauri/target/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Environment / Secrets
+.env
+.env.local
+.env.*.local
+credentials.json
+
+# Tauri build artifacts
+src-tauri/gen/
+src-tauri/WixTools/
+src-tauri/icons/*.ico.bak
+*.dmg
+*.msi
+*.AppImage
+*.deb
+*.exe
+*.app
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Test / conversion folders (local dev only)
+Daconvertire/
+Convertite/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Misc
+.claude/

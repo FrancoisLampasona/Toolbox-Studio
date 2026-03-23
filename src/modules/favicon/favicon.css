@@ -1,0 +1,329 @@
+.favicon-logo {
+  background: linear-gradient(135deg, #ff8f3d, #ffd166);
+  box-shadow: 0 0 22px rgba(255, 175, 84, 0.28);
+}
+
+.favicon-panel,
+.favicon-right-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.favicon-section,
+.favicon-card,
+.favicon-empty-state {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)),
+    var(--bg-glass);
+  box-shadow: var(--shadow-sm);
+}
+
+.favicon-section {
+  display: grid;
+  gap: 12px;
+}
+
+.favicon-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.favicon-field,
+.favicon-color-field,
+.favicon-slider-field {
+  display: grid;
+  gap: 8px;
+}
+
+.favicon-field span,
+.favicon-color-field span,
+.favicon-slider-head span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.favicon-color-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.favicon-color-input {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.favicon-color-input input[type="color"] {
+  width: 48px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.favicon-slider-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.favicon-slider-head strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.favicon-range {
+  width: 100%;
+  accent-color: #ffb347;
+}
+
+.favicon-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.favicon-toggle input {
+  accent-color: #ffb347;
+}
+
+.favicon-center {
+  display: grid;
+  gap: 16px;
+  min-height: 100%;
+}
+
+.favicon-empty-state {
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.favicon-empty-state .empty-icon {
+  font-size: 34px;
+}
+
+.favicon-empty-state p {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.favicon-empty-state span {
+  max-width: 420px;
+  line-height: 1.6;
+}
+
+.favicon-source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.favicon-source-card {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    rgba(20, 20, 34, 0.72);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+.favicon-source-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 179, 71, 0.28);
+}
+
+.favicon-source-card.active {
+  border-color: rgba(255, 179, 71, 0.42);
+  box-shadow: 0 10px 26px rgba(255, 179, 71, 0.12);
+}
+
+.favicon-source-card.has-error {
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.favicon-source-thumb {
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+    #12121d;
+  display: grid;
+  place-items: center;
+}
+
+.favicon-source-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.favicon-source-placeholder {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.favicon-source-info {
+  display: grid;
+  gap: 4px;
+}
+
+.favicon-source-info strong {
+  font-size: 14px;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+
+.favicon-source-info span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.favicon-source-format {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.favicon-center-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.favicon-center-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.favicon-card {
+  display: grid;
+  gap: 12px;
+}
+
+.favicon-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.favicon-card-head strong {
+  font-size: 14px;
+  letter-spacing: -0.02em;
+}
+
+.favicon-card-head span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.favicon-code-block {
+  margin: 0;
+  padding: 14px;
+  min-height: 180px;
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(7, 9, 16, 0.72);
+  color: #f3f1ff;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.favicon-output-list {
+  display: grid;
+  gap: 10px;
+}
+
+.favicon-output-list.compact .favicon-output-item {
+  padding: 10px 12px;
+}
+
+.favicon-output-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.favicon-output-item div {
+  display: grid;
+  gap: 3px;
+}
+
+.favicon-output-item strong {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.favicon-output-item span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.favicon-placeholder-text {
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.favicon-status {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.favicon-status.success {
+  color: #8cf2c6;
+}
+
+.favicon-status.error {
+  color: #ff9a9a;
+}
+
+@media (max-width: 980px) {
+  .favicon-center-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .favicon-center-meta {
+    justify-content: flex-start;
+  }
+}
