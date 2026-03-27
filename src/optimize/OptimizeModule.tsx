@@ -817,51 +817,58 @@ export default function OptimizeModule({
     let disposed = false;
     let cleanup: (() => void) | null = null;
 
-    void getCurrentWindow()
-      .onDragDropEvent(async ({ payload }) => {
-        if (!active) {
-          return;
-        }
-
-        if (payload.type === "leave") {
-          setDropZoneVisible(false);
-          setDropPathCount(0);
-          return;
-        }
-
-        const insideModule = isPositionInsideModule(payload.position.x, payload.position.y);
-        if (!insideModule) {
-          setDropZoneVisible(false);
-          if (payload.type !== "drop") {
-            setDropPathCount(0);
+    try {
+      getCurrentWindow()
+        .onDragDropEvent(async ({ payload }) => {
+          if (!active) {
+            return;
           }
-          return;
-        }
 
-        if (payload.type === "enter") {
-          setDropZoneVisible(true);
-          setDropPathCount(payload.paths.length);
-          return;
-        }
+          if (payload.type === "leave") {
+            setDropZoneVisible(false);
+            setDropPathCount(0);
+            return;
+          }
 
-        if (payload.type === "over") {
-          setDropZoneVisible(true);
-          return;
-        }
+          const insideModule = isPositionInsideModule(payload.position.x, payload.position.y);
+          if (!insideModule) {
+            setDropZoneVisible(false);
+            if (payload.type !== "drop") {
+              setDropPathCount(0);
+            }
+            return;
+          }
 
-        if (payload.type === "drop") {
-          setDropZoneVisible(false);
-          setDropPathCount(0);
-          await handleDroppedPaths(payload.paths);
-        }
-      })
-      .then((unlisten) => {
-        if (disposed) {
-          unlisten();
-          return;
-        }
-        cleanup = unlisten;
-      });
+          if (payload.type === "enter") {
+            setDropZoneVisible(true);
+            setDropPathCount(payload.paths.length);
+            return;
+          }
+
+          if (payload.type === "over") {
+            setDropZoneVisible(true);
+            return;
+          }
+
+          if (payload.type === "drop") {
+            setDropZoneVisible(false);
+            setDropPathCount(0);
+            await handleDroppedPaths(payload.paths);
+          }
+        })
+        .then((unlisten) => {
+          if (disposed) {
+            unlisten();
+            return;
+          }
+          cleanup = unlisten;
+        })
+        .catch((error) => {
+          console.error("Errore drag & drop Optimize:", error);
+        });
+    } catch (error) {
+      console.error("Errore drag & drop Optimize:", error);
+    }
 
     return () => {
       disposed = true;
@@ -1569,21 +1576,6 @@ export default function OptimizeModule({
     if (previewImage) setShowPreview(true);
   }, [previewImage]);
 
-  const activePresetLabels = useMemo(() => {
-    if (useCustom || activePresets.size === 0) {
-      return [`Custom ${customWidth}×${customHeight}`];
-    }
-
-    return presets
-      .filter((preset) => activePresets.has(`${preset.width}x${preset.height}${preset.suffix}`))
-      .map((preset) => preset.name);
-  }, [activePresets, customHeight, customWidth, presets, useCustom]);
-
-  const qualityOverrideCount = Object.keys(fileQualityOverrides).length;
-  const selectedSourceCount = inputPaths.length;
-  const outputLabel = basename(outputPath);
-  const batchModeLabel =
-    batchWeightMode === "reale" ? "Peso reale" : batchWeightMode === "stimato" ? "Peso stimato" : "Nessuna stima";
   const workspaceStatus = scanning
     ? scanProgress
       ? `Scansione ${Math.min(scanProgress.current, scanProgress.total)}/${scanProgress.total}`
@@ -1605,77 +1597,54 @@ export default function OptimizeModule({
     >
       <div className={`module-drop-overlay ${dropZoneVisible ? "visible" : ""}`} aria-hidden={!dropZoneVisible}>
         <div className="module-drop-overlay-card">
-          <span className="module-drop-overlay-kicker">Drag & drop nativo</span>
           <strong>
             {dropPathCount > 0
-              ? `Rilascia ${dropPathCount} ${dropPathCount === 1 ? "elemento" : "elementi"} per aggiungerli`
-              : "Rilascia file o cartelle per aggiungerli"}
+              ? `Rilascia ${dropPathCount} ${dropPathCount === 1 ? "elemento" : "elementi"}`
+              : "Rilascia file o cartelle"}
           </strong>
-          <span>Toolbox Creative Studio li unira alla sessione optimize corrente senza perdere il resto.</span>
         </div>
       </div>
 
-      <header className="app-header optimize-header">
-        <div className="header-brand">
-          <button onClick={onBackHome} className="btn-icon btn-back" aria-label="Torna alla Home">
-            ←
-          </button>
-          <div className="header-logo">C</div>
-          <div className="header-brand-copy">
-            <h1>Ottimizza<span>Immagini</span></h1>
-            <span className="header-subtitle">Workbench immagini con preview, peso finale e controllo qualità per-file</span>
-          </div>
+      {/* Minimal top bar */}
+      <header className="opt-bar">
+        <div className="opt-bar-left">
+          <button onClick={onBackHome} className="opt-bar-back" aria-label="Home">←</button>
+          <h1 className="opt-bar-title">Optimize</h1>
+          <span className="opt-bar-sep" />
+          <span className="opt-bar-stat">{images.length} file</span>
+          <span className="opt-bar-stat">{selectedFiles.size} sel</span>
+          <span className="opt-bar-stat">{jobCount} output</span>
+          {batchWeightMode !== "idle" ? (
+            <span className="opt-bar-stat opt-bar-stat--accent">{formatBytes(batchWeightOutputSize)}</span>
+          ) : null}
         </div>
-        <div className="header-actions optimize-header-actions">
-          <span className="optimize-status-pill">{images.length} asset</span>
-          <span className="optimize-status-pill">{selectedFiles.size} selezionate</span>
-          <span className={`optimize-status-pill ${batchWeightMode !== "idle" ? "accent" : ""}`}>
-            {batchModeLabel}
-          </span>
-          <button onClick={addFiles} className="btn btn-secondary">
-            + File
+        <div className="opt-bar-right">
+          <button onClick={addFiles} className="opt-btn">+ File</button>
+          <button onClick={addFolder} className="opt-btn">+ Cartella</button>
+          <button onClick={reloadInputs} disabled={scanning || inputPaths.length === 0} className="opt-btn">
+            {scanning ? "Scan..." : "Ricarica"}
           </button>
-          <button onClick={addFolder} className="btn btn-secondary">
-            + Cartella
-          </button>
-          <button
-            onClick={reloadInputs}
-            disabled={scanning || inputPaths.length === 0}
-            className="btn btn-secondary"
-          >
-            {scanning ? "Scansione..." : "Ricarica"}
-          </button>
-          <button onClick={() => void chooseOutput()} className="btn btn-secondary">
-            Output
-          </button>
+          <button onClick={() => void chooseOutput()} className="opt-btn">Output</button>
         </div>
       </header>
 
-      <div className="app optimize-app-shell">
+      {/* 3-col layout */}
+      <div className="opt-shell">
         <ResizableModuleLayout
-          storageKey="clickoso-layout-optimize-v2"
-          defaultLeftWidth={272}
-          defaultRightWidth={388}
-          leftMinWidth={236}
-          leftMaxWidth={360}
-          rightMinWidth={332}
-          rightMaxWidth={460}
-          centerMinWidth={560}
+          storageKey="toolbox-layout-optimize-v3"
+          defaultLeftWidth={260}
+          defaultRightWidth={360}
+          leftMinWidth={220}
+          leftMaxWidth={340}
+          rightMinWidth={300}
+          rightMaxWidth={440}
+          centerMinWidth={480}
           left={
-            <div className="optimize-column optimize-column-presets">
-              <div className="optimize-column-header">
-                <div>
-                  <span className="optimize-column-kicker">Preset</span>
-                  <h2>Varianti e tagli</h2>
-                </div>
-                <span className="optimize-column-badge">
-                  {jobCount} {jobCount === 1 ? "output" : "output"}
-                </span>
+            <div className="opt-panel opt-panel--presets">
+              <div className="opt-panel-head">
+                <h2>Dimensioni</h2>
+                <span className="opt-badge">{jobCount}</span>
               </div>
-              <p className="optimize-column-copy">
-                Scegli preset o dimensioni custom. Il batch eredita formato, resize mode, naming e qualità
-                globale, con possibilità di override per singolo file.
-              </p>
               <PresetPanel
                 presets={presets}
                 activePresets={activePresets}
@@ -1690,98 +1659,39 @@ export default function OptimizeModule({
             </div>
           }
           center={
-            <div className="optimize-stage">
-              <section className="optimize-stage-hero">
-                <div className="optimize-stage-copy">
-                  <span className="optimize-stage-kicker">Workbench</span>
-                  <h2>Ottimizzazione batch pronta per export web</h2>
-                  <p>
-                    Carica immagini o cartelle, controlla il naming output e verifica subito quanto peserà il
-                    batch finale prima e dopo la conversione.
-                  </p>
-                </div>
-                <div className="optimize-stage-metrics">
-                  <div className="optimize-metric-card">
-                    <span className="optimize-metric-label">Sorgenti</span>
-                    <strong>{selectedSourceCount}</strong>
-                    <span>{images.length} asset caricati</span>
-                  </div>
-                  <div className="optimize-metric-card">
-                    <span className="optimize-metric-label">Selezione</span>
-                    <strong>{selectedFiles.size}</strong>
-                    <span>{selectedFiles.size === 1 ? "file attivo" : "file attivi"}</span>
-                  </div>
-                  <div className="optimize-metric-card">
-                    <span className="optimize-metric-label">Varianti</span>
-                    <strong>{totalOps}</strong>
-                    <span>{jobCount} preset nel batch</span>
-                  </div>
-                  <div className="optimize-metric-card">
-                    <span className="optimize-metric-label">{batchModeLabel}</span>
-                    <strong>{formatBytes(batchWeightOutputSize)}</strong>
-                    <span>{batchWeightMode === "idle" ? "attendi selezione" : "dimensione finale prevista"}</span>
-                  </div>
-                </div>
-              </section>
-
-              <section className="optimize-stage-toolbar">
-                <div className="optimize-stage-chip-row">
-                  <span className="optimize-stage-chip">{workspaceStatus}</span>
-                  <span className="optimize-stage-chip">Output: {outputLabel}</span>
-                  <span className="optimize-stage-chip">
-                    {qualityOverrideCount > 0 ? `${qualityOverrideCount} override qualità` : `Qualità ${quality}%`}
-                  </span>
-                  {activePresetLabels.slice(0, 2).map((label) => (
-                    <span key={label} className="optimize-stage-chip accent">
-                      {label}
-                    </span>
-                  ))}
-                  {activePresetLabels.length > 2 ? (
-                    <span className="optimize-stage-chip">+{activePresetLabels.length - 2} preset</span>
-                  ) : null}
-                </div>
-                <div className="optimize-stage-actions">
-                  <button onClick={() => void chooseOutput()} className="btn btn-secondary">
-                    Scegli output
+            <div className="opt-center">
+              {/* Compact status row */}
+              <div className="opt-status-row">
+                <span className="opt-status-text">{workspaceStatus}</span>
+                <div className="opt-status-actions">
+                  <button onClick={() => void chooseOutput()} className="opt-btn opt-btn--sm">
+                    📁 {basename(outputPath)}
                   </button>
-                  <button
-                    onClick={() => void openOutput()}
-                    disabled={!outputPath}
-                    className="btn btn-secondary"
-                  >
-                    Apri output
+                  <button onClick={() => void openOutput()} disabled={!outputPath} className="opt-btn opt-btn--sm">
+                    Apri
                   </button>
                 </div>
-              </section>
+              </div>
 
-              <section className="optimize-stage-panel">
-                <div className="optimize-stage-panel-head">
-                  <div>
-                    <span className="optimize-column-kicker">Libreria batch</span>
-                    <h3>Immagini caricate</h3>
-                  </div>
-                  <span className="optimize-column-badge subtle">
-                    {images.length === 0 ? "Vuota" : `${images.length} elementi`}
-                  </span>
-                </div>
-                <div className="optimize-grid-area">
-                  <ImageGrid
-                    images={images}
-                    selectedFiles={selectedFiles}
-                    onToggleSelect={handleCardToggle}
-                    onSelectAll={selectAll}
-                    onDeselectAll={deselectAll}
-                    onClearAll={clearImages}
-                    scanning={scanning}
-                    fileEstimates={fileEstimates}
-                  />
-                </div>
-              </section>
+              {/* Image grid */}
+              <div className="opt-grid-area">
+                <ImageGrid
+                  images={images}
+                  selectedFiles={selectedFiles}
+                  onToggleSelect={handleCardToggle}
+                  onSelectAll={selectAll}
+                  onDeselectAll={deselectAll}
+                  onClearAll={clearImages}
+                  scanning={scanning}
+                  fileEstimates={fileEstimates}
+                />
+              </div>
             </div>
           }
           right={
-            <div className="optimize-column optimize-column-settings">
-              <div className="optimize-preview-shell">
+            <div className="opt-panel opt-panel--settings">
+              {/* Preview */}
+              <div className="opt-preview">
                 <ImagePreview
                   image={previewImage}
                   targetWidth={primaryTarget?.width || customWidth}
@@ -1789,17 +1699,14 @@ export default function OptimizeModule({
                   resizeMode={resizeMode}
                 />
                 {previewImage ? (
-                  <div className="optimize-preview-actions">
-                    <button className="btn btn-sm" onClick={openPreview}>
-                      Apri anteprima grande
-                    </button>
-                    <span className="optimize-preview-caption" title={previewImage.filename}>
-                      {previewImage.filename}
-                    </span>
+                  <div className="opt-preview-meta">
+                    <button className="opt-btn opt-btn--sm" onClick={openPreview}>Espandi</button>
+                    <span className="opt-preview-name" title={previewImage.filename}>{previewImage.filename}</span>
                   </div>
                 ) : null}
               </div>
 
+              {/* Settings */}
               <SettingsPanel
                 format={format}
                 onFormatChange={setFormat}
